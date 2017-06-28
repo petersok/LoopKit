@@ -81,7 +81,7 @@ class InsulinMathTests: XCTestCase {
     }
 
     var insulinSensitivitySchedule: InsulinSensitivitySchedule {
-        return InsulinSensitivitySchedule(unit: HKUnit.milligramsPerDeciliterUnit(), dailyItems: [RepeatingScheduleValue(startTime: 0.0, value: 40.0)])!
+        return InsulinSensitivitySchedule(unit: HKUnit.milligramsPerDeciliter(), dailyItems: [RepeatingScheduleValue(startTime: 0.0, value: 40.0)])!
     }
 
     func testDoseEntriesFromReservoirValues() {
@@ -95,7 +95,7 @@ class InsulinMathTests: XCTestCase {
         for (expected, calculated) in zip(output, doses) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
             XCTAssertEqual(expected.endDate, calculated.endDate)
-            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: pow(10, -14))
+            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: Double(Float.ulpOfOne))
             XCTAssertEqual(expected.unit, calculated.unit)
         }
     }
@@ -135,6 +135,46 @@ class InsulinMathTests: XCTestCase {
         XCTAssertTrue(InsulinMath.isContinuous(input, from: dateFormatter.date(from: "2016-01-30T18:30:00")!, to: dateFormatter.date(from: "2016-01-30T20:40:00")!))
 
         XCTAssertFalse(InsulinMath.isContinuous(input, from: dateFormatter.date(from: "2016-01-30T17:30:00")!, to: dateFormatter.date(from: "2016-01-30T20:40:00")!))
+    }
+
+    func testIOBFromSuspend() {
+        let input = loadDoseFixture("suspend_dose")
+        let reconciledOutput = loadDoseFixture("suspend_dose_reconciled")
+        let normalizedOutput = loadDoseFixture("suspend_dose_reconciled_normalized")
+        let iobOutput = loadInsulinValueFixture("suspend_dose_reconciled_normalized_iob")
+        let basals = loadBasalRateScheduleFixture("basal")
+        let actionDuration = TimeInterval(hours: 4)
+
+        let reconciled = InsulinMath.reconcileDoses(input)
+
+        XCTAssertEqual(reconciledOutput.count, reconciled.count)
+
+        for (expected, calculated) in zip(reconciledOutput, reconciled) {
+            XCTAssertEqual(expected.startDate, calculated.startDate)
+            XCTAssertEqual(expected.endDate, calculated.endDate)
+            XCTAssertEqual(expected.value, calculated.value)
+            XCTAssertEqual(expected.unit, calculated.unit)
+        }
+
+        let normalized = InsulinMath.normalize(reconciled, againstBasalSchedule: basals)
+
+        XCTAssertEqual(normalizedOutput.count, normalized.count)
+
+        for (expected, calculated) in zip(normalizedOutput, normalized) {
+            XCTAssertEqual(expected.startDate, calculated.startDate)
+            XCTAssertEqual(expected.endDate, calculated.endDate)
+            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: Double(Float.ulpOfOne))
+            XCTAssertEqual(expected.unit, calculated.unit)
+        }
+
+        let iob = InsulinMath.insulinOnBoardForDoses(normalized, actionDuration: actionDuration)
+
+        XCTAssertEqual(iobOutput.count, iob.count)
+
+        for (expected, calculated) in zip(iobOutput, iob) {
+            XCTAssertEqual(expected.startDate, calculated.startDate)
+            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: Double(Float.ulpOfOne))
+        }
     }
 
     func testIOBFromDoses() {
@@ -178,7 +218,7 @@ class InsulinMathTests: XCTestCase {
 
             for (expected, calculated) in zip(output, iob) {
                 XCTAssertEqual(expected.startDate, calculated.startDate)
-                XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: pow(10, -14))
+                XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: Double(Float.ulpOfOne))
             }
         }
     }
@@ -218,7 +258,7 @@ class InsulinMathTests: XCTestCase {
         for (expected, calculated) in zip(output, doses) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
             XCTAssertEqual(expected.endDate, calculated.endDate)
-            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: pow(10, -14))
+            XCTAssertEqualWithAccuracy(expected.value, calculated.value, accuracy: Double(Float.ulpOfOne))
             XCTAssertEqual(expected.unit, calculated.unit)
         }
     }
@@ -276,7 +316,7 @@ class InsulinMathTests: XCTestCase {
 
         for (expected, calculated) in zip(output, effects) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
-            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: .milligramsPerDeciliterUnit()), calculated.quantity.doubleValue(for: .milligramsPerDeciliterUnit()), accuracy: 1.0)
+            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: .milligramsPerDeciliter()), calculated.quantity.doubleValue(for: .milligramsPerDeciliter()), accuracy: 1.0)
         }
     }
 
@@ -295,7 +335,7 @@ class InsulinMathTests: XCTestCase {
 
         for (expected, calculated) in zip(output, effects) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
-            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: .milligramsPerDeciliterUnit()), calculated.quantity.doubleValue(for: .milligramsPerDeciliterUnit()), accuracy: pow(10, -14))
+            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: .milligramsPerDeciliter()), calculated.quantity.doubleValue(for: .milligramsPerDeciliter()), accuracy: Double(Float.ulpOfOne))
         }
     }
 
@@ -314,7 +354,7 @@ class InsulinMathTests: XCTestCase {
 
         for (expected, calculated) in zip(output, effects) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
-            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: HKUnit.milligramsPerDeciliterUnit()), calculated.quantity.doubleValue(for: HKUnit.milligramsPerDeciliterUnit()), accuracy: 1.0, String(describing: expected.startDate))
+            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: HKUnit.milligramsPerDeciliter()), calculated.quantity.doubleValue(for: HKUnit.milligramsPerDeciliter()), accuracy: 1.0, String(describing: expected.startDate))
         }
     }
 
@@ -333,7 +373,7 @@ class InsulinMathTests: XCTestCase {
 
         for (expected, calculated) in zip(output, effects) {
             XCTAssertEqual(expected.startDate, calculated.startDate)
-            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: HKUnit.milligramsPerDeciliterUnit()), calculated.quantity.doubleValue(for: HKUnit.milligramsPerDeciliterUnit()), accuracy: 1.0)
+            XCTAssertEqualWithAccuracy(expected.quantity.doubleValue(for: HKUnit.milligramsPerDeciliter()), calculated.quantity.doubleValue(for: HKUnit.milligramsPerDeciliter()), accuracy: 1.0)
         }
     }
 
@@ -350,7 +390,7 @@ class InsulinMathTests: XCTestCase {
         let input = loadDoseFixture("normalize_edge_case_doses_input")
         let output = InsulinMath.totalDeliveryForDoses(input)
 
-        XCTAssertEqualWithAccuracy(18.8, output, accuracy: pow(10, -2))
+        XCTAssertEqualWithAccuracy(18.8, output, accuracy: 0.01)
     }
 
     func testTrimContinuingDoses() {

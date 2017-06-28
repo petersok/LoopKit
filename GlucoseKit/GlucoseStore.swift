@@ -56,7 +56,7 @@ public final class GlucoseStore: HealthKitSampleStore {
     /// The interval before which glucose values should be purged from HealthKit. If nil, glucose values are not purged.
     public var managedDataInterval: TimeInterval? = TimeInterval(hours: 3)
 
-    /// The interval of glucose data to use for reflection adjustments
+    /// The interval of glucose data to keep in cache
     public var reflectionDataInterval: TimeInterval = TimeInterval(minutes: 30)
 
     /// The interval of glucose data to use for momentum calculation
@@ -96,19 +96,20 @@ public final class GlucoseStore: HealthKitSampleStore {
      
      This operation is performed asynchronously and the completion will be executed on an arbitrary background queue.
 
-     - parameter values:        A an array of value tuples:
-        - quantity:      The glucose sample quantity
-        - date:          The date the sample was collected
-        - isDisplayOnly: Whether the reading was shifted for visual consistency after calibration
-     - parameter device:        The description of the device the collected the sample
-     - parameter completionHandler: A closure called once the glucose values were saved. The closure takes three arguments:
+     - Parameters:
+        - values:        A an array of value tuples:
+            - `quantity`:      The glucose sample quantity
+            - `date`:          The date the sample was collected
+            - `isDisplayOnly`: Whether the reading was shifted for visual consistency after calibration
+        - device:        The description of the device the collected the sample
+        - completion: A closure called once the glucose values were saved. The closure takes three arguments:
         - success: Whether the sample was successfully saved
         - samples: The saved samples
         - error:   An error object explaining why the save failed
      */
-    public func addGlucoseValues(_ values: [(quantity: HKQuantity, date: Date, isDisplayOnly: Bool)], device: HKDevice?, completionHandler: @escaping (_ success: Bool, _ samples: [GlucoseValue]?, _ error: Error?) -> Void) {
+    public func addGlucoseValues(_ values: [(quantity: HKQuantity, date: Date, isDisplayOnly: Bool)], device: HKDevice?, completion: @escaping (_ success: Bool, _ samples: [GlucoseValue]?, _ error: Error?) -> Void) {
         guard values.count > 0 else {
-            completionHandler(false, [], nil)
+            completion(false, [], nil)
             return
         }
 
@@ -128,18 +129,16 @@ public final class GlucoseStore: HealthKitSampleStore {
         healthStore.save(glucose, withCompletion: { (completed, error) in
             self.dataAccessQueue.async {
                 if completed {
-                    let sortedGlucose = glucose.sorted { $0.startDate < $1.startDate }
-
-                    self.sampleDataCache.append(contentsOf: sortedGlucose)
+                    self.unionSampleDataCache(with: glucose)
                     self.purgeOldGlucoseSamples()
 
-                    if let latestGlucose = sortedGlucose.last, self.latestGlucose == nil || self.latestGlucose!.startDate < latestGlucose.startDate {
+                    if let latestGlucose = self.sampleDataCache.last, self.latestGlucose == nil || self.latestGlucose!.startDate < latestGlucose.startDate {
                         self.latestGlucose = latestGlucose
                     }
 
-                    completionHandler(completed, sortedGlucose, error)
+                    completion(completed, glucose, error)
                 } else {
-                    completionHandler(completed, [], error)
+                    completion(completed, [], error)
                 }
             }
         }) 
@@ -151,6 +150,8 @@ public final class GlucoseStore: HealthKitSampleStore {
      *This method should only be called from the `dataAccessQueue`*
      */
     private func purgeOldGlucoseSamples() {
+        dispatchPrecondition(condition: .onQueue(dataAccessQueue))
+
         let cacheStartDate = Date(timeIntervalSinceNow: -max(momentumDataInterval, reflectionDataInterval))
 
         sampleDataCache = sampleDataCache.filter { $0.startDate >= cacheStartDate }
@@ -168,47 +169,42 @@ public final class GlucoseStore: HealthKitSampleStore {
         }
     }
 
-    private func glucoseSamplesPredicate(start: Date, end: Date?) -> NSPredicate {
-        return HKQuery.predicateForSamples(
-            withStart: start,
-            end: end ?? Date.distantFuture,
-            options: [.strictStartDate]
-        )
-    }
-
-    private func getCachedGlucoseSamples(start: Date, end: Date? = nil, completionHandler: @escaping (_ samples: [HKQuantitySample]) -> Void) {
+    private func getCachedGlucoseSamples(start: Date, end: Date? = nil, completion: @escaping (_ samples: [HKQuantitySample]) -> Void) {
         if UIApplication.shared.isProtectedDataAvailable {
             getGlucoseSamples(start: start, end: end) { (result) in
                 switch result {
                 case .success(let samples):
-                    completionHandler(samples)
+                    completion(samples)
                 case .failure:
-                    completionHandler(self.sampleDataCache.filterDateRange(start, end))
+                    completion(self.sampleDataCache.filterDateRange(start, end))
                 }
             }
         } else {
             dataAccessQueue.async {
                 let samples = self.sampleDataCache.filterDateRange(start, end)
-                completionHandler(samples)
+                completion(samples)
             }
         }
     }
 
-    private func getGlucoseSamples(start: Date, end: Date? = nil, completionHandler: @escaping (_ result: GlucoseStoreResult<[HKQuantitySample]>) -> Void) {
-        let predicate = glucoseSamplesPredicate(start: start, end: end)
+    private func getGlucoseSamples(start: Date, end: Date? = nil, completion: @escaping (_ result: GlucoseStoreResult<[HKQuantitySample]>) -> Void) {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
         let sortDescriptors = [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
 
-        let query = HKSampleQuery(sampleType: glucoseType, predicate: predicate, limit: Int(HKObjectQueryNoLimit), sortDescriptors: sortDescriptors) { (_, samples, error) -> Void in
+        let query = HKSampleQuery(sampleType: glucoseType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: sortDescriptors) { (_, samples, error) -> Void in
 
             self.dataAccessQueue.async {
-                if let lastGlucose = samples?.last as? HKQuantitySample, self.latestGlucose == nil || self.latestGlucose!.startDate < lastGlucose.startDate {
+                let samples = samples as? [HKQuantitySample] ?? []
+
+                if let lastGlucose = samples.last, self.latestGlucose == nil || self.latestGlucose!.startDate < lastGlucose.startDate {
                     self.latestGlucose = lastGlucose
                 }
 
                 if let error = error {
-                    completionHandler(.failure(error))
+                    completion(.failure(error))
                 } else {
-                    completionHandler(.success((samples as? [HKQuantitySample]) ?? []))
+                    self.unionSampleDataCache(with: samples)
+                    completion(.success(samples))
                 }
             }
         }
@@ -223,7 +219,7 @@ public final class GlucoseStore: HealthKitSampleStore {
     ///   - end: The latest date of values to retrieve, if provided
     ///   - completion: A closure called once the values have been retrieved
     ///   - result: An array of glucose values, in chronological order by startDate
-    public func getGlucoseValues(start: Date, end: Date? = nil, completion: @escaping (_ result: GlucoseStoreResult<[GlucoseValue]>) -> Void) {
+    public func getGlucoseValues(start: Date, end: Date? = nil, completion: @escaping (_ result: GlucoseStoreResult<[GlucoseSampleValue]>) -> Void) {
         getGlucoseSamples(start: start, end: end) { (result) -> Void in
             switch result {
             case .success(let samples):
@@ -241,7 +237,7 @@ public final class GlucoseStore: HealthKitSampleStore {
     ///   - end: The latest date of values to retrieve, if provided
     ///   - completion: A closure called once the values have been retrieved
     ///   - values: An array of glucose values, in chronological order by startDate
-    public func getCachedGlucoseValues(start: Date, end: Date? = nil, completion: @escaping (_ values: [GlucoseValue]) -> Void) {
+    public func getCachedGlucoseValues(start: Date, end: Date? = nil, completion: @escaping (_ values: [GlucoseSampleValue]) -> Void) {
         getCachedGlucoseSamples(start: start, end: end) { (samples) in
             completion(samples)
         }
@@ -273,13 +269,14 @@ public final class GlucoseStore: HealthKitSampleStore {
     // MARK: - Math
 
     private func unionSampleDataCache(with samples: [HKQuantitySample]) {
-        self.dataAccessQueue.async {
-            let samplesToCache = samples.filter({ !self.sampleDataCache.contains($0) })
+        dispatchPrecondition(condition: .onQueue(dataAccessQueue))
 
-            if samplesToCache.count > 0 {
-                self.sampleDataCache.append(contentsOf: samplesToCache)
-                self.sampleDataCache.sort(by: { $0.startDate < $1.startDate })
-            }
+        let samplesToCache = samples.filter({ !self.sampleDataCache.contains($0) })
+
+        if samplesToCache.count > 0 {
+            sampleDataCache.append(contentsOf: samplesToCache)
+            purgeOldGlucoseSamples()
+            sampleDataCache.sort(by: { $0.startDate < $1.startDate })
         }
     }
 
@@ -291,18 +288,17 @@ public final class GlucoseStore: HealthKitSampleStore {
      This operation is performed asynchronously and the completion will be executed on an arbitrary background queue.
 
      - Parameters:
-        - completionHandler: A closure called once the calculation has completed. The closure takes two arguments:
+        - completion: A closure called once the calculation has completed. The closure takes two arguments:
         - effects: The calculated effect values, or an empty array if the glucose data isn't suitable for momentum calculation.
         - error:   Error is always nil
      */
-    public func getRecentMomentumEffect(_ completionHandler: @escaping (_ effects: [GlucoseEffect], _ error: Error?) -> Void) {
+    public func getRecentMomentumEffect(_ completion: @escaping (_ effects: [GlucoseEffect], _ error: Error?) -> Void) {
         getCachedGlucoseSamples(start: Date(timeIntervalSinceNow: -momentumDataInterval)) { (samples) in
-            self.unionSampleDataCache(with: samples)
             let effects = GlucoseMath.linearMomentumEffectForGlucoseEntries(samples,
                 duration: self.momentumDataInterval,
                 delta: TimeInterval(minutes: 5)
             )
-            completionHandler(effects, nil)
+            completion(effects, nil)
         }
     }
 
@@ -316,23 +312,45 @@ public final class GlucoseStore: HealthKitSampleStore {
         - values:       The first and last glucose values in the requested period, or nil if the glucose data is missing or contains a calibration shift
         - error:        Error is always nil
      */
+    @available(*, deprecated, message: "Use getGlucoseChange(start:end:completion:) instead")
     public func getRecentGlucoseChange(_ completionHandler: @escaping (_ values: (GlucoseValue, GlucoseValue)?, _ error: Error?) -> Void) {
-        getCachedGlucoseSamples(start: Date(timeIntervalSinceNow: -reflectionDataInterval)) { (samples) in
-            self.unionSampleDataCache(with: samples)
+        getGlucoseChange(start: Date(timeIntervalSinceNow: -reflectionDataInterval)) { (change) in
+            completionHandler(change, nil)
+        }
+    }
 
+    /// Calculates the a change in glucose values between the specified date interval.
+    /// 
+    /// Values within the date interval must not include a calibration, and the returned change 
+    /// values will be from the same source.
+    ///
+    /// - Parameters:
+    ///   - start: The earliest date to include. The earliest supported date is determined by `reflectionDataInterval`.
+    ///   - end: The latest date to include
+    ///   - completion: A closure called once the calculation has completed
+    ///   - change: A tuple of the first and last glucose values describing the change, if computable.
+    public func getGlucoseChange(start: Date, end: Date? = nil, completion: @escaping (_ change: (GlucoseValue, GlucoseValue)?) -> Void) {
+        getCachedGlucoseSamples(start: start, end: end) { (samples) in
             let change: (GlucoseValue, GlucoseValue)?
 
-            if  GlucoseMath.isCalibrated(samples) && samples.count > 2,
-                let first = samples.first,
-                let last = samples.last,
-                first.startDate < last.startDate
-            {
-                change = (first, last)
+            if let provenanceIdentifier = samples.last?.provenanceIdentifier {
+                // Enforce a single source
+                let samples = GlucoseMath.filterAfterCalibration(samples).filter { $0.provenanceIdentifier == provenanceIdentifier }
+
+                if samples.count > 1,
+                    let first = samples.first,
+                    let last = samples.last,
+                    first.startDate < last.startDate
+                {
+                    change = (first, last)
+                } else {
+                    change = nil
+                }
             } else {
                 change = nil
             }
 
-            completionHandler(change, nil)
+            completion(change)
         }
     }
 
