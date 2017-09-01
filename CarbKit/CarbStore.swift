@@ -106,7 +106,7 @@ public final class CarbStore: HealthKitSampleStore {
     }
 
     /// The preferred unit. iOS currently only supports grams for dietary carbohydrates.
-    public private(set) var preferredUnit: HKUnit = HKUnit.gram()
+    public let preferredUnit = HKUnit.gram()
 
     /// Carbohydrate-to-insulin ratio
     public var carbRatioSchedule: CarbRatioSchedule?
@@ -363,7 +363,7 @@ public final class CarbStore: HealthKitSampleStore {
 
     private var carbEntryCache: Set<StoredCarbEntry>
 
-    private var dataAccessQueue: DispatchQueue = DispatchQueue(label: "com.loudnate.CarbKit.dataAccessQueue", attributes: [])
+    private var dataAccessQueue: DispatchQueue = DispatchQueue(label: "com.loudnate.CarbKit.dataAccessQueue")
 
     /// Fetches samples from HealthKit
     ///
@@ -395,17 +395,11 @@ public final class CarbStore: HealthKitSampleStore {
     ///   - completion: A closure called once the samples have been retrieved
     ///   - samples: An array of samples, in chronological order by startDate
     private func getCachedCarbSamples(start: Date, end: Date? = nil, completion: @escaping (_ samples: [StoredCarbEntry]) -> Void) {
-        if UIApplication.shared.isProtectedDataAvailable {
-            getCarbSamples(start: start, end: end) { (result) in
-                switch result {
-                case .success(let samples):
-                    completion(samples)
-                case .failure:
-                    completion(self.carbEntryCache.filterDateRange(start, end).sorted(by: <))
-                }
-            }
-        } else {
-            dataAccessQueue.async {
+        getCarbSamples(start: start, end: end) { (result) in
+            switch result {
+            case .success(let samples):
+                completion(samples)
+            case .failure:
                 completion(self.carbEntryCache.filterDateRange(start, end).sorted(by: <))
             }
         }

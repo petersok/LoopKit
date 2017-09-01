@@ -25,7 +25,7 @@ class InsulinMathTests: XCTestCase {
         print(String(data: try! JSONSerialization.data(
             withJSONObject: insulinValues.map({ (value) -> [String: Any] in
                 return [
-                    "date": DateFormatter.ISO8601LocalTime().string(from: value.startDate),
+                    "date": ISO8601DateFormatter.localTimeDate().string(from: value.startDate),
                     "value": value.value,
                     "unit": "U"
                 ]
@@ -34,11 +34,32 @@ class InsulinMathTests: XCTestCase {
         print("\n\n")
     }
 
+    private func printDoses(_ doses: [DoseEntry]) {
+        print("\n\n")
+        print(String(data: try! JSONSerialization.data(
+            withJSONObject: doses.map({ (value) -> [String: Any] in
+                var obj: [String: Any] = [
+                    "type": value.type.pumpEventType!.rawValue,
+                    "start_at": ISO8601DateFormatter.localTimeDate().string(from: value.startDate),
+                    "end_at": ISO8601DateFormatter.localTimeDate().string(from: value.endDate),
+                    "amount": value.value,
+                    "unit": value.unit.rawValue
+                ]
+
+                if let syncIdentifier = value.syncIdentifier {
+                    obj["raw"] = syncIdentifier
+                }
+
+                return obj
+            }),
+            options: .prettyPrinted), encoding: .utf8)!)
+        print("\n\n")
+    }
 
     func loadReservoirFixture(_ resourceName: String) -> [NewReservoirValue] {
 
         let fixture: [JSONDictionary] = loadFixture(resourceName)
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
 
         return fixture.map {
             return NewReservoirValue(startDate: dateFormatter.date(from: $0["date"] as! String)!, unitVolume: $0["amount"] as! Double)
@@ -47,11 +68,12 @@ class InsulinMathTests: XCTestCase {
 
     func loadDoseFixture(_ resourceName: String) -> [DoseEntry] {
         let fixture: [JSONDictionary] = loadFixture(resourceName)
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
 
         return fixture.flatMap {
             guard let unit = DoseUnit(rawValue: $0["unit"] as! String),
-                  let type = PumpEventType(rawValue: $0["type"] as! String)
+                  let pumpType = PumpEventType(rawValue: $0["type"] as! String),
+                  let type = DoseType(pumpEventType: pumpType)
             else {
                 return nil
             }
@@ -62,14 +84,16 @@ class InsulinMathTests: XCTestCase {
                 endDate: dateFormatter.date(from: $0["end_at"] as! String)!,
                 value: $0["amount"] as! Double,
                 unit: unit,
-                description: $0["description"] as? String
+                description: $0["description"] as? String,
+                syncIdentifier: $0["raw"] as? String,
+                managedObjectID: nil
             )
         }
     }
 
     func loadInsulinValueFixture(_ resourceName: String) -> [InsulinValue] {
         let fixture: [JSONDictionary] = loadFixture(resourceName)
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
 
         return fixture.map {
             return InsulinValue(startDate: dateFormatter.date(from: $0["date"] as! String)!, value: $0["value"] as! Double)
@@ -78,7 +102,7 @@ class InsulinMathTests: XCTestCase {
 
     func loadGlucoseEffectFixture(_ resourceName: String) -> [GlucoseEffect] {
         let fixture: [JSONDictionary] = loadFixture(resourceName)
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
 
         return fixture.map {
             return GlucoseEffect(startDate: dateFormatter.date(from: $0["date"] as! String)!, quantity: HKQuantity(unit: HKUnit(from: $0["unit"] as! String), doubleValue:$0["amount"] as! Double))
@@ -118,7 +142,7 @@ class InsulinMathTests: XCTestCase {
     func testContinuousReservoirValues() {
         var input = loadReservoirFixture("reservoir_history_with_rewind_and_prime_input")
 
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
         XCTAssertTrue(InsulinMath.isContinuous(input, from: dateFormatter.date(from: "2016-01-30T16:40:00")!, to: dateFormatter.date(from: "2016-01-30T20:40:00")!))
 
         // We don't assert whether it's "stale".
@@ -146,7 +170,7 @@ class InsulinMathTests: XCTestCase {
     func testNonContinuousReservoirValues() {
         let input = loadReservoirFixture("reservoir_history_with_continuity_holes")
 
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
         XCTAssertTrue(InsulinMath.isContinuous(input, from: dateFormatter.date(from: "2016-01-30T18:30:00")!, to: dateFormatter.date(from: "2016-01-30T20:40:00")!))
 
         XCTAssertFalse(InsulinMath.isContinuous(input, from: dateFormatter.date(from: "2016-01-30T17:30:00")!, to: dateFormatter.date(from: "2016-01-30T20:40:00")!))
@@ -223,13 +247,13 @@ class InsulinMathTests: XCTestCase {
     func testInsulinOnBoardLimitsForExponentialModel() {
         let insulinModel = ExponentialInsulinModel(actionDuration: TimeInterval(minutes: 360), peakActivityTime: TimeInterval(minutes: 75))
         
-        XCTAssertEqualWithAccuracy(1, insulinModel.percentEffectRemainingAtTime(TimeInterval(minutes: -1)), accuracy: 0.001)
-        XCTAssertEqualWithAccuracy(1, insulinModel.percentEffectRemainingAtTime(TimeInterval(minutes: 0)), accuracy: 0.001)
-        XCTAssertEqualWithAccuracy(0, insulinModel.percentEffectRemainingAtTime(TimeInterval(minutes: 360)), accuracy: 0.001)
-        XCTAssertEqualWithAccuracy(0, insulinModel.percentEffectRemainingAtTime(TimeInterval(minutes: 361)), accuracy: 0.001)
+        XCTAssertEqualWithAccuracy(1, insulinModel.percentEffectRemaining(at: .minutes(-1)), accuracy: 0.001)
+        XCTAssertEqualWithAccuracy(1, insulinModel.percentEffectRemaining(at: .minutes(0)), accuracy: 0.001)
+        XCTAssertEqualWithAccuracy(0, insulinModel.percentEffectRemaining(at: .minutes(360)), accuracy: 0.001)
+        XCTAssertEqualWithAccuracy(0, insulinModel.percentEffectRemaining(at: .minutes(361)), accuracy: 0.001)
         
         // Test random point
-        XCTAssertEqualWithAccuracy(0.5110493617156, insulinModel.percentEffectRemainingAtTime(TimeInterval(minutes: 108)), accuracy: 0.001)
+        XCTAssertEqualWithAccuracy(0.5110493617156, insulinModel.percentEffectRemaining(at: .minutes(108)), accuracy: 0.001)
 
     }
     
@@ -363,6 +387,7 @@ class InsulinMathTests: XCTestCase {
             XCTAssertEqual(expected.endDate, calculated.endDate)
             XCTAssertEqual(expected.value, calculated.value)
             XCTAssertEqual(expected.unit, calculated.unit)
+            XCTAssertEqual(expected.syncIdentifier, calculated.syncIdentifier)
         }
     }
 
@@ -373,10 +398,10 @@ class InsulinMathTests: XCTestCase {
         let insulinModel = WalshInsulinModel(actionDuration: TimeInterval(hours: 4))
 
         measure {
-            _ = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+            _ = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
         }
 
-        let effects = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+        let effects = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
 
         XCTAssertEqualWithAccuracy(Float(output.count), Float(effects.count), accuracy: 1.0)
 
@@ -393,10 +418,10 @@ class InsulinMathTests: XCTestCase {
         let insulinModel = WalshInsulinModel(actionDuration: TimeInterval(hours: 4))
 
         measure {
-            _ = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+            _ = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
         }
 
-        let effects = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+        let effects = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
 
         XCTAssertEqual(output.count, effects.count)
 
@@ -413,10 +438,10 @@ class InsulinMathTests: XCTestCase {
         let insulinModel = WalshInsulinModel(actionDuration: TimeInterval(hours: 4))
 
         measure {
-            _ = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+            _ = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
         }
 
-        let effects = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+        let effects = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
 
         XCTAssertEqual(output.count, effects.count)
 
@@ -433,10 +458,10 @@ class InsulinMathTests: XCTestCase {
         let insulinModel = WalshInsulinModel(actionDuration: TimeInterval(hours: 4))
 
         measure {
-            _ = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+            _ = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
         }
 
-        let effects = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+        let effects = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
 
         XCTAssertEqual(output.count, effects.count)
 
@@ -451,7 +476,7 @@ class InsulinMathTests: XCTestCase {
         let insulinSensitivitySchedule = self.insulinSensitivitySchedule
         let insulinModel = WalshInsulinModel(actionDuration: TimeInterval(hours: 4))
 
-        let effects = InsulinMath.glucoseEffectsForDoses(input, insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
+        let effects = input.glucoseEffects(insulinModel: insulinModel, insulinSensitivity: insulinSensitivitySchedule)
 
         XCTAssertEqual(0, effects.count)
     }
@@ -464,7 +489,7 @@ class InsulinMathTests: XCTestCase {
     }
 
     func testTrimContinuingDoses() {
-        let dateFormatter = DateFormatter.ISO8601LocalTime()
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
         let input = loadDoseFixture("normalized_doses")
 
         // Last temp ends at 2015-10-15T18:14:35
@@ -475,4 +500,57 @@ class InsulinMathTests: XCTestCase {
         XCTAssertEqual(input.count, trimmed.count)
     }
 
+    #if swift(>=3.2)
+    @available(iOS 11.0, *)
+    func testDosesOverlayBasalProfile() {
+        let dateFormatter = ISO8601DateFormatter.localTimeDate()
+        let input = loadDoseFixture("reconcile_history_output").sorted { $0.startDate < $1.startDate }
+        let output = loadDoseFixture("doses_overlay_basal_profile_output")
+        let basals = loadBasalRateScheduleFixture("basal")
+
+        let doses = input.overlayBasalSchedule(
+            basals,
+            // A start date before the first entry should generate a basal
+            startingAt: dateFormatter.date(from: "2016-02-15T14:01:04")!,
+            endingAt: Date(),
+            insertingBasalEntries: true
+        )
+
+        XCTAssertEqual(output.count, doses.count)
+
+        XCTAssertEqual(doses.first?.startDate, dateFormatter.date(from: "2016-02-15T14:01:04")!)
+
+        for (expected, calculated) in zip(output, doses) {
+            XCTAssertEqual(expected.startDate, calculated.startDate)
+            XCTAssertEqual(expected.endDate, calculated.endDate)
+            XCTAssertEqual(expected.value, calculated.value)
+            XCTAssertEqual(expected.unit, calculated.unit)
+        }
+
+        // Test trimming end
+        let dosesTrimmedEnd = input[0..<input.count - 11].overlayBasalSchedule(
+            basals,
+            startingAt: dateFormatter.date(from: "2016-02-15T14:01:04")!,
+            // An end date before some input entries should omit them
+            endingAt: dateFormatter.date(from: "2016-02-15T19:45:00")!,
+            insertingBasalEntries: true
+        )
+
+        XCTAssertEqual(output.count - 14, dosesTrimmedEnd.count)
+        // The BasalProfileStart event shouldn't be generated
+        XCTAssertEqual(dosesTrimmedEnd.last!.endDate, dateFormatter.date(from: "2016-02-15T19:36:11")!)
+
+        // Test a start date equal to the first entry, the expected case
+        let dosesMatchingStart = input.overlayBasalSchedule(
+            basals,
+            startingAt: dateFormatter.date(from: "2016-02-15T15:06:05")!,
+            endingAt: Date(),
+            insertingBasalEntries: true
+        )
+
+        // The inserted entries aren't included
+        XCTAssertEqual(output.count - 2, dosesMatchingStart.count)
+        XCTAssertEqual(dosesMatchingStart.first!.startDate, dateFormatter.date(from: "2016-02-15T15:06:05")!)
+    }
+    #endif
 }
