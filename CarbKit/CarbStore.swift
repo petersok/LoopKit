@@ -131,8 +131,7 @@ public final class CarbStore: HealthKitSampleStore {
     private(set) public var delta: TimeInterval = TimeInterval(minutes: 5)
 
     /// The factor by which the entered absorption time can be extended to accomodate slower-than-expected absorption
-    public var absorptionTimeOverrun: Double = 1.0
-//dm changed 1.5 to 1.0 to test the process of incorporating LoopKit updates to Loop
+    public var absorptionTimeOverrun: Double = 1.5
 
     /// The longest expected absorption time interval for carbohydrates. Defaults to 8 hours.
     public var maximumAbsorptionTimeInterval: TimeInterval {
