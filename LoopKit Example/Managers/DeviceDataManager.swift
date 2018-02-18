@@ -20,6 +20,7 @@ class DeviceDataManager : CarbStoreDelegate {
 
     init() {
         let healthStore = HKHealthStore()
+        let cacheStore = PersistenceController(directoryURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!)
 
         carbStore = CarbStore(
             healthStore: healthStore,
@@ -34,6 +35,7 @@ class DeviceDataManager : CarbStoreDelegate {
         }
         doseStore = DoseStore(
             healthStore: healthStore,
+            cacheStore: cacheStore,
             insulinModel: insulinModel,
             basalProfile: basalRateSchedule,
             insulinSensitivitySchedule: insulinSensitivitySchedule
@@ -72,7 +74,9 @@ class DeviceDataManager : CarbStoreDelegate {
         didSet {
             UserDefaults.standard.insulinActionDuration = insulinActionDuration
 
-            doseStore.insulinActionDuration = insulinActionDuration
+            if let duration = insulinActionDuration {
+                doseStore.insulinModel = WalshInsulinModel(actionDuration: duration)
+            }
         }
     }
 
