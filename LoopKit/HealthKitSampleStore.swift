@@ -22,22 +22,10 @@ public enum HealthKitSampleStoreResult<T> {
 }
 
 
-open class HealthKitSampleStore {
+public class HealthKitSampleStore {
     public enum StoreError: Error {
         case authorizationDenied
         case healthKitError(HKError)
-    }
-    
-    /// All the sample types we need permission to read
-    @available(*, deprecated, message: "Use HealthKitSampleStore.getter:sampleType instead")
-    public var readTypes: Set<HKSampleType> {
-        return Set(arrayLiteral: sampleType)
-    }
-    
-    /// All the sample types we need permission to share
-    @available(*, deprecated, message: "Use HealthKitSampleStore.getter:sampleType instead")
-    public var shareTypes: Set<HKSampleType> {
-        return Set(arrayLiteral: sampleType)
     }
     
     /// The sample type managed by this store
@@ -45,6 +33,9 @@ open class HealthKitSampleStore {
 
     /// The health store used for underlying queries
     public let healthStore: HKHealthStore
+
+    /// For unit testing only.
+    internal var testQueryStore: HKSampleQueryTestable?
 
     private let log = OSLog(category: "HealthKitSampleStore")
 
@@ -63,27 +54,6 @@ open class HealthKitSampleStore {
     }
 
     // MARK: - Authorization
-
-    /**
-     Initializes the HealthKit authorization flow for all required sample types
-
-     This operation is performed asynchronously and the completion will be executed on an arbitrary background queue.
-
-     - parameter completion: A closure called after authorization is completed. This closure takes two arguments:
-        - success: Whether the authorization to share was successful
-        - error:   An error object explaining why the authorization was unsuccessful
-     */
-    @available(*, deprecated, message: "Use HealthKitSampleStore.authorize(_:) instead")
-    open func authorize(_ completion: @escaping (_ success: Bool, _ error: Error?) -> Void) {
-        authorize { result in
-            switch result {
-            case .success:
-                completion(true, nil)
-            case .failure(let error):
-                completion(false, error)
-            }
-        }
-    }
     
     /// Requests authorization from HealthKit to share and read the sample type.
     ///
@@ -91,7 +61,7 @@ open class HealthKitSampleStore {
     ///
     /// - Parameter completion: A closure called after the authorization is completed
     /// - Parameter result: The authorization result
-    open func authorize(_ completion: @escaping (_ result: HealthKitSampleStoreResult<Bool>) -> Void) {
+    public func authorize(_ completion: @escaping (_ result: HealthKitSampleStoreResult<Bool>) -> Void) {
         healthStore.requestAuthorization(toShare: [sampleType], read: [sampleType]) { (completed, error) -> Void in
             if completed && !self.sharingDenied {
                 self.createQuery()
@@ -128,7 +98,7 @@ open class HealthKitSampleStore {
     }
 
     /// The earliest sample date for which additions and deletions are observed
-    public var observationStart: Date {
+    public internal(set) var observationStart: Date {
         didSet {
             // If we are now looking farther back, then reset the query
             if oldValue > observationStart {
@@ -145,7 +115,7 @@ open class HealthKitSampleStore {
     /// - Parameters:
     ///   - query: The query which triggered the update
     ///   - error: An error during the update, if one occurred
-    open func observeUpdates(to query: HKObserverQuery, error: Error?) {
+    internal func observeUpdates(to query: HKObserverQuery, error: Error?) {
         if error == nil {
             let anchoredObjectQuery = HKAnchoredObjectQuery(
                 type: self.sampleType,
@@ -174,8 +144,27 @@ open class HealthKitSampleStore {
     ///   - added: An array of samples added
     ///   - deleted: An array of samples deleted
     ///   - error: An error from the query, if one occurred
-    open func processResults(from query: HKAnchoredObjectQuery, added: [HKSample], deleted: [HKDeletedObject], error: Error?) {
+    internal func processResults(from query: HKAnchoredObjectQuery, added: [HKSample], deleted: [HKDeletedObject], error: Error?) {
         // To be overridden
+    }
+}
+
+
+// MARK: - Unit Test Support
+extension HealthKitSampleStore: HKSampleQueryTestable {
+    func executeSampleQuery(
+        for type: HKSampleType,
+        matching predicate: NSPredicate,
+        limit: Int = HKObjectQueryNoLimit,
+        sortDescriptors: [NSSortDescriptor]? = nil,
+        resultsHandler: @escaping (HKSampleQuery, [HKSample]?, Error?) -> Void
+    ) {
+        if let tester = testQueryStore {
+            tester.executeSampleQuery(for: type, matching: predicate, limit: limit, sortDescriptors: sortDescriptors, resultsHandler: resultsHandler)
+        } else {
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: limit, sortDescriptors: sortDescriptors, resultsHandler: resultsHandler)
+            healthStore.execute(query)
+        }
     }
 }
 
@@ -210,15 +199,17 @@ extension HealthKitSampleStore {
     /// - Parameter completion: A closure called after the request is completed
     /// - Parameter result: A boolean indicating the new background delivery state
     private func enableBackgroundDelivery(_ completion: @escaping (_ result: HealthKitSampleStoreResult<Bool>) -> Void) {
-        healthStore.enableBackgroundDelivery(for: sampleType, frequency: .immediate) { (enabled, error) in
-            if let error = error {
-                completion(.failure(.healthKitError(HKError(_nsError: error as NSError))))
-            } else if enabled {
-                completion(.success(true))
-            } else {
-                assertionFailure()
+        #if os(iOS)
+            healthStore.enableBackgroundDelivery(for: sampleType, frequency: .immediate) { (enabled, error) in
+                if let error = error {
+                    completion(.failure(.healthKitError(HKError(_nsError: error as NSError))))
+                } else if enabled {
+                    completion(.success(true))
+                } else {
+                    assertionFailure()
+                }
             }
-        }
+        #endif
     }
 
     /// Disables the immediate background delivery of updates to samples from HealthKit.
@@ -228,15 +219,17 @@ extension HealthKitSampleStore {
     /// - Parameter completion: A closure called after the request is completed
     /// - Parameter result: A boolean indicating the new background delivery state
     private func disableBackgroundDelivery(_ completion: @escaping (_ result: HealthKitSampleStoreResult<Bool>) -> Void) {
-        healthStore.disableBackgroundDelivery(for: sampleType) { (disabled, error) in
-            if let error = error {
-                completion(.failure(.healthKitError(HKError(_nsError: error as NSError))))
-            } else if disabled {
-                completion(.success(false))
-            } else {
-                assertionFailure()
+        #if os(iOS)
+            healthStore.disableBackgroundDelivery(for: sampleType) { (disabled, error) in
+                if let error = error {
+                    completion(.failure(.healthKitError(HKError(_nsError: error as NSError))))
+                } else if disabled {
+                    completion(.success(false))
+                } else {
+                    assertionFailure()
+                }
             }
-        }
+        #endif
     }
 }
 
