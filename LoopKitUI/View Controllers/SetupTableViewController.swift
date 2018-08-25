@@ -68,7 +68,7 @@ open class SetupTableViewController: UITableViewController {
 
 open class SetupTableFooterView: UIView {
 
-    open let primaryButton = SetupButton(type: .custom)
+    public let primaryButton = SetupButton(type: .custom)
 
     fileprivate override init(frame: CGRect) {
         let buttonStack = UIStackView(arrangedSubviews: [primaryButton])
@@ -104,6 +104,6 @@ open class SetupTableFooterView: UIView {
 
 public extension SetupButton {
     func resetTitle() {
-        setTitle(NSLocalizedString("Continue", comment: "Title of the setup button to continue"), for: .normal)
+        setTitle(LocalizedString("Continue", comment: "Title of the setup button to continue"), for: .normal)
     }
 }
