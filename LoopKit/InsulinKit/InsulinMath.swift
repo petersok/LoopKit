@@ -460,8 +460,9 @@ extension Collection where Iterator.Element == DoseEntry {
         let unit = HKUnit.milligramsPerDeciliter
 
         repeat {
+            // dm61 replaced dose.startDate with date
             let value = reduce(0) { (value, dose) -> Double in
-                return value + dose.glucoseEffect(at: date, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: dose.startDate).doubleValue(for: unit), delay: delay, delta: delta)
+                return value + dose.glucoseEffect(at: date, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: date).doubleValue(for: unit), delay: delay, delta: delta)
             }
 
             values.append(GlucoseEffect(startDate: date, quantity: HKQuantity(unit: unit, doubleValue: value)))
