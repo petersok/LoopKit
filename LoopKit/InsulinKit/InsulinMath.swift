@@ -455,43 +455,27 @@ extension Collection where Iterator.Element == DoseEntry {
             return []
         }
 
-
         var values = [GlucoseEffect]()
         let unit = HKUnit.milligramsPerDeciliter
-        var subIntervalStartValue: Double = 0
-        var nextStartValue: Double = 0
-        var nextStart: Date = start
-        
-        // split start to end interval into subintervals across insulin sensitivity schedule
-        for scheduledInsulinSensitivity in insulinSensitivity.between(start: start, end: end) {
-            let startSubinterval = Swift.max(start, scheduledInsulinSensitivity.startDate)
-            let endSubinterval = Swift.min(end, scheduledInsulinSensitivity.endDate)
-            let currentInsulinSensitivity = insulinSensitivity.quantity(at: startSubinterval).doubleValue(for: unit)
-            var date = Swift.max(startSubinterval, nextStart)
-            repeat {
-                let value = reduce(subIntervalStartValue) { (value, dose) -> Double in
-                    return value + dose.glucoseEffect(at: date, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
-                }
-                
-                values.append(GlucoseEffect(startDate: date, quantity: HKQuantity(unit: unit, doubleValue: value)))
-                date = date.addingTimeInterval(delta)
-                nextStart = date
-                nextStartValue = value
-            } while date <= endSubinterval
-            subIntervalStartValue = nextStartValue
-        }
+        var date = start
 
-        /*
         repeat {
-            // dm61 replaced dose.startDate with date
             let value = reduce(0) { (value, dose) -> Double in
-                return value + dose.glucoseEffect(at: date, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: date).doubleValue(for: unit), delay: delay, delta: delta)
+                var runningValue: Double = 0
+                for scheduledInsulinSensitivity in insulinSensitivity.between(start: start, end: date) {
+                    let startInterval = Swift.max(start, scheduledInsulinSensitivity.startDate)
+                    let endInterval = Swift.min(date, scheduledInsulinSensitivity.endDate)
+                    let currentInsulinSensitivity = insulinSensitivity.quantity(at: startInterval).doubleValue(for: unit)
+                    runningValue = runningValue
+                        + dose.glucoseEffect(at: endInterval, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
+                        - dose.glucoseEffect(at: startInterval, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
+                }
+                return value + runningValue
             }
 
             values.append(GlucoseEffect(startDate: date, quantity: HKQuantity(unit: unit, doubleValue: value)))
             date = date.addingTimeInterval(delta)
         } while date <= end
-        */
 
         return values
     }
