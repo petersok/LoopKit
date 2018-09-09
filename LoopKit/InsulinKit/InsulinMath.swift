@@ -461,7 +461,7 @@ extension Collection where Iterator.Element == DoseEntry {
 
         repeat {
             let value = reduce(0) { (value, dose) -> Double in
-                var runningValue: Double = 0
+                var runningValue: Double = dose.glucoseEffect(at: start, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: start).doubleValue(for: unit), delay: delay, delta: delta)
                 for scheduledInsulinSensitivity in insulinSensitivity.between(start: start, end: date) {
                     let startInterval = Swift.max(start, scheduledInsulinSensitivity.startDate)
                     let endInterval = Swift.min(date, scheduledInsulinSensitivity.endDate)
