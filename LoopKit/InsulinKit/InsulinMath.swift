@@ -461,16 +461,19 @@ extension Collection where Iterator.Element == DoseEntry {
 
         repeat {
             let value = reduce(0) { (value, dose) -> Double in
-                var runningValue: Double = dose.glucoseEffect(at: start, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: start).doubleValue(for: unit), delay: delay, delta: delta)
+                // initialize dose effect on bg
+                var currentValue: Double = dose.glucoseEffect(at: start, model: insulinModel, insulinSensitivity: insulinSensitivity.quantity(at: dose.startDate).doubleValue(for: unit), delay: delay, delta: delta)
+                // iterate dose effect calculations across ISF schedule intervals
                 for scheduledInsulinSensitivity in insulinSensitivity.between(start: start, end: date) {
-                    let startInterval = Swift.max(start, scheduledInsulinSensitivity.startDate)
-                    let endInterval = Swift.min(date, scheduledInsulinSensitivity.endDate)
-                    let currentInsulinSensitivity = insulinSensitivity.quantity(at: startInterval).doubleValue(for: unit)
-                    runningValue = runningValue
-                        + dose.glucoseEffect(at: endInterval, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
-                        - dose.glucoseEffect(at: startInterval, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
+                    let intervalStart = Swift.max(start, scheduledInsulinSensitivity.startDate)
+                    let intervalEnd = Swift.min(date, scheduledInsulinSensitivity.endDate)
+                    let currentInsulinSensitivity = insulinSensitivity.quantity(at: intervalStart).doubleValue(for: unit)
+                    // bg effect for the current ISF schedule interval
+                    currentValue = currentValue
+                        + dose.glucoseEffect(at: intervalEnd, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
+                        - dose.glucoseEffect(at: intervalStart, model: insulinModel, insulinSensitivity: currentInsulinSensitivity, delay: delay, delta: delta)
                 }
-                return value + runningValue
+                return value + currentValue
             }
 
             values.append(GlucoseEffect(startDate: date, quantity: HKQuantity(unit: unit, doubleValue: value)))
