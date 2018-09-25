@@ -94,7 +94,7 @@ public final class CarbEntryEditViewController: UITableViewController {
                 proteinQuantity: proteinQuantity,
                 fatQuantity: fatQuantity,
                 startDate: date,
-                foodType: String = "** Computed **"
+                foodType: String
             )
         } else {
             return nil
