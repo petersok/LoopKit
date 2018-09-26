@@ -51,10 +51,6 @@ public final class CarbEntryEditViewController: UITableViewController {
     }
 
     fileprivate var quantity: HKQuantity?
-    
-    fileprivate var proteinQuantity: HKQuantity?
-    
-    fileprivate var fatQuantity: HKQuantity?
 
     fileprivate var date = Date()
 
@@ -86,12 +82,7 @@ public final class CarbEntryEditViewController: UITableViewController {
         }
     }
 
-    public var updatedProteinFatEntry = NewProteinFatEntry(
-                proteinQuantity: proteinQuantity,
-                fatQuantity: fatQuantity,
-                startDate: date,
-                foodType: foodType
-            )
+    public var updatedProteinFatEntry: NewProteinFatEntry(proteinQuantity: nil, fatQuantity: nil, startDate: nil, foodType: nil)
     
     private var isSampleEditable: Bool {
         return originalCarbEntry?.createdByCurrentApp != false
