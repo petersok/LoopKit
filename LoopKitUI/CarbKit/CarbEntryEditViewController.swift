@@ -34,7 +34,7 @@ public final class CarbEntryEditViewController: UITableViewController {
 
     public var maxAbsorptionTime = TimeInterval(hours: 8)
 
-    public var maximumDateFutureInterval = TimeInterval(hours: 4)
+    public var maximumDateFutureInterval = TimeInterval(hours: 10)
 
     public var originalCarbEntry: StoredCarbEntry? {
         didSet {
@@ -51,6 +51,10 @@ public final class CarbEntryEditViewController: UITableViewController {
     }
 
     fileprivate var quantity: HKQuantity?
+    
+    fileprivate var proteinQuantity: HKQuantity?
+    
+    fileprivate var fatQuantity: HKQuantity?
 
     fileprivate var date = Date()
 
@@ -113,8 +117,9 @@ public final class CarbEntryEditViewController: UITableViewController {
         case date
         case foodType
         case absorptionTime
+        case proteinValue
 
-        static let count = 4
+        static let count = 5
     }
 
     public override func numberOfSections(in tableView: UITableView) -> Int {
@@ -202,6 +207,23 @@ public final class CarbEntryEditViewController: UITableViewController {
             cell.maximumDuration = maxAbsorptionTime
             cell.delegate = self
 
+            return cell
+            
+        case .proteinValue:
+            let cell = tableView.dequeueReusableCell(withIdentifier: DecimalTextFieldTableViewCell.className) as! DecimalTextFieldTableViewCell
+            
+            if let proteinQuantity = proteinQuantity {
+                cell.number = NSNumber(value: proteinQuantity.doubleValue(for: preferredUnit))
+            }
+            cell.textField.isEnabled = isSampleEditable
+            cell.unitLabel?.text = String(describing: preferredUnit)
+            
+            if originalCarbEntry == nil {
+                cell.textField.becomeFirstResponder()
+            }
+            
+            cell.delegate = self
+            
             return cell
         }
     }
