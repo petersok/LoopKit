@@ -77,12 +77,12 @@ extension NewCarbEntry {
 }
 
 public struct NewProteinFatEntry {
-    public var proteinQuantity: HKQuantity
-    public var fatQuantity: HKQuantity
+    public var proteinQuantity: HKQuantity?
+    public var fatQuantity: HKQuantity?
     public var startDate: Date
-    public var foodType: String
+    public var foodType: String?
     
-    public init(proteinQuantity: HKQuantity, fatQuantity: HKQuantity, startDate: Date, foodType: String) {
+    public init(proteinQuantity: HKQuantity?, fatQuantity: HKQuantity?, startDate: Date, foodType: String?) {
         self.proteinQuantity = proteinQuantity
         self.fatQuantity = fatQuantity
         self.startDate = startDate
