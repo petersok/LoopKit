@@ -82,7 +82,7 @@ public final class CarbEntryEditViewController: UITableViewController {
         }
     }
 
-    public var updatedProteinFatEntry: NewProteinFatEntry(proteinQuantity: nil, fatQuantity: nil, startDate: nil, foodType: nil)
+    public var updatedProteinFatEntry: NewProteinFatEntry?
     
     private var isSampleEditable: Bool {
         return originalCarbEntry?.createdByCurrentApp != false

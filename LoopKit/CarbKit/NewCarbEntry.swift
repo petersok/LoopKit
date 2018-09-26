@@ -80,13 +80,11 @@ public struct NewProteinFatEntry {
     public var proteinQuantity: HKQuantity?
     public var fatQuantity: HKQuantity?
     public var startDate: Date?
-    public var foodType: String?
     
-    public init(proteinQuantity: HKQuantity?, fatQuantity: HKQuantity?, startDate: Date?, foodType: String?) {
+    public init(proteinQuantity: HKQuantity?, fatQuantity: HKQuantity?, startDate: Date?) {
         self.proteinQuantity = proteinQuantity
         self.fatQuantity = fatQuantity
         self.startDate = startDate
-        self.foodType = foodType
     }
 }
 
