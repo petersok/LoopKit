@@ -311,6 +311,18 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
             } else {
                 quantity = nil
             }
+        case .protein?:
+            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+                quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+            } else {
+                quantity = nil
+            }
+        case .fat?:
+            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+                quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+            } else {
+                quantity = nil
+            }
         case .foodType?:
             foodType = cell.textField.text
         default:
