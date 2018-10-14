@@ -51,6 +51,12 @@ public final class CarbEntryEditViewController: UITableViewController {
     }
 
     fileprivate var quantity: HKQuantity?
+    
+    fileprivate var proteinQuantity: HKQuantity?
+    
+    fileprivate var fatQuantity: HKQuantity?
+    
+    fileprivate var FPUQuantity: HKQuantity?
 
     fileprivate var date = Date()
 
@@ -69,6 +75,26 @@ public final class CarbEntryEditViewController: UITableViewController {
             if let o = originalCarbEntry, o.quantity == quantity && o.startDate == date && o.foodType == foodType && o.absorptionTime == absorptionTime {
                 return nil  // No changes were made
             }
+            
+            /** Do this only if there is protein or fat **/
+            
+            /** Run FPU calculation here **/
+           
+            let entry = NewCarbEntry(
+                quantity: HKQuantity(unit: .gram(), doubleValue: 150),
+                startDate: date + 60 * 60,
+                foodType: foodType,
+                absorptionTime: .minutes(240)) // Does this need an "external ID"?
+            
+            /* // Need some stuff here to actually save the new entry..
+            var carbStore: CarbStore!
+            
+            carbStore.addCarbEntry(entry) { (result) -> Void in
+                    DispatchQueue.main.async {
+                        
+                    }
+            }
+             */
             
             return NewCarbEntry(
                 quantity: quantity,
@@ -313,15 +339,15 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
             }
         case .protein?:
             if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
-                quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+                proteinQuantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
-                quantity = nil
+                proteinQuantity = nil
             }
         case .fat?:
             if let cell = cell as? FatDecimalTextFieldTableViewCell, let number = cell.number {
-                quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+                fatQuantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
-                quantity = nil
+                fatQuantity = nil
             }
         case .foodType?:
             foodType = cell.textField.text
