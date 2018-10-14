@@ -32,7 +32,7 @@ public final class CarbEntryEditViewController: UITableViewController {
     /// Entry configuration values. Must be set before presenting.
     public var absorptionTimePickerInterval = TimeInterval(minutes: 30)
 
-    public var maxAbsorptionTime = TimeInterval(hours: 8)
+    public var maxAbsorptionTime = TimeInterval(hours: 16)
 
     public var maximumDateFutureInterval = TimeInterval(hours: 4)
 
@@ -108,8 +108,8 @@ public final class CarbEntryEditViewController: UITableViewController {
 
     fileprivate enum Row: Int {
         case value
-        case protein
-        case fat
+        case protein // RSS
+        case fat // RSS
         case date
         case foodType
         case absorptionTime
@@ -128,7 +128,7 @@ public final class CarbEntryEditViewController: UITableViewController {
     public override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Row(rawValue: indexPath.row)! {
         case .value:
-            let cell = tableView.dequeueReusableCell(withIdentifier: DecimalTextFieldTableViewCell.className) as! DecimalTextFieldTableViewCell
+            let cell = tableView.dequeueReusableCell(withIdentifier: CarbDecimalTextFieldTableViewCell.className) as! CarbDecimalTextFieldTableViewCell
 
             if let quantity = quantity {
                 cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
@@ -144,7 +144,7 @@ public final class CarbEntryEditViewController: UITableViewController {
 
             return cell
         case .protein:
-            let cell = tableView.dequeueReusableCell(withIdentifier: DecimalTextFieldTableViewCell.className) as! DecimalTextFieldTableViewCell
+            let cell = tableView.dequeueReusableCell(withIdentifier: ProteinDecimalTextFieldTableViewCell.className) as! ProteinDecimalTextFieldTableViewCell
             
             if let quantity = quantity {
                 cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
@@ -160,7 +160,7 @@ public final class CarbEntryEditViewController: UITableViewController {
             
             return cell
         case .fat:
-            let cell = tableView.dequeueReusableCell(withIdentifier: DecimalTextFieldTableViewCell.className) as! DecimalTextFieldTableViewCell
+            let cell = tableView.dequeueReusableCell(withIdentifier: FatDecimalTextFieldTableViewCell.className) as! FatDecimalTextFieldTableViewCell
             
             if let quantity = quantity {
                 cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
@@ -306,19 +306,19 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
 
         switch Row(rawValue: row) {
         case .value?:
-            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+            if let cell = cell as? CarbDecimalTextFieldTableViewCell, let number = cell.number {
                 quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
                 quantity = nil
             }
         case .protein?:
-            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+            if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
                 quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
                 quantity = nil
             }
         case .fat?:
-            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+            if let cell = cell as? FatDecimalTextFieldTableViewCell, let number = cell.number {
                 quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
                 quantity = nil
