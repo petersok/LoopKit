@@ -106,34 +106,30 @@ public final class CarbEntryEditViewController: UITableViewController {
                 if squareWaveDuration > 16 { // Set some reasonable max.
                     squareWaveDuration = 16
                 }
-             
-                /*
-                let entry = NewCarbEntry(
-                quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
-                startDate: date + 60 * onsetDelay,
-                foodType: foodType,
-                absorptionTime: .hours(squareWaveDuration)) // Does this need an "external ID"?
             
-                carbStore.addCarbEntry(entry) { (result) in Void.self } /// This doesn't work yet.
-                 */
-                
-                // *** This is the square-wave protein and fat entry. Need a way to do both this and the normal one.
-                return NewCarbEntry(
+                // This is a carb entry for just the protein and fat.
+                let FPUEntry = NewCarbEntry(
                     quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
                     startDate: date + 60 * onsetDelay,
                     foodType: foodType,
                     absorptionTime: .hours(squareWaveDuration),
                     externalID: originalCarbEntry?.externalID)
+                
+                return FPUEntry
            
+            } else {
+            
+                // This is the normal carb entry.
+                let carbEntry = NewCarbEntry(
+                    quantity: quantity,
+                    startDate: date,
+                    foodType: foodType,
+                    absorptionTime: absorptionTime,
+                    externalID: originalCarbEntry?.externalID)
+                
+                return carbEntry
             }
-        
-            // *** This is the normal carb entry.
-            return NewCarbEntry(
-                quantity: quantity,
-                startDate: date,
-                foodType: foodType,
-                absorptionTime: absorptionTime,
-                externalID: originalCarbEntry?.externalID)
+   
         } else {
             return nil
         }
