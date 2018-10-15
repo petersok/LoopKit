@@ -52,9 +52,11 @@ public final class CarbEntryEditViewController: UITableViewController {
 
     fileprivate var quantity: HKQuantity?
     
-    fileprivate var proteinQuantity: HKQuantity?
+    fileprivate var carbQuantity: Int?
     
-    fileprivate var fatQuantity: HKQuantity?
+    fileprivate var proteinQuantity: Int?
+    
+    fileprivate var fatQuantity: Int?
     
     fileprivate var FPUQuantity: HKQuantity?
 
@@ -75,34 +77,49 @@ public final class CarbEntryEditViewController: UITableViewController {
             if let o = originalCarbEntry, o.quantity == quantity && o.startDate == date && o.foodType == foodType && o.absorptionTime == absorptionTime {
                 return nil  // No changes were made
             }
+            /*
+            let FPCaloriesRatio = 120
+            let carbRatio = 10 // This is just for the the formula - same for everyone.
+            let onsetDelay = 60 // Minutes to delay FPU dose
+            let carbGrams = carbQuantity
+            let proteinGrams = proteinQuantity
+            let fatGrams = fatQuantity
             
-            /** Do this only if there is protein or fat **/
+            let proteinCalories = proteinGrams * 4
+            let fatCalories = fatGrams * 9
+            var lowCarbMultiplier: Double = Double(carbGrams)
             
-            /** Run FPU calculation here **/
-           
-            let entry = NewCarbEntry(
-                quantity: HKQuantity(unit: .gram(), doubleValue: 150),
-                startDate: date + 60 * 60,
-                foodType: foodType,
-                absorptionTime: .minutes(240)) // Does this need an "external ID"?
-            
-            /* // Need some stuff here to actually save the new entry..
-            var carbStore: CarbStore!
-            
-            carbStore.addCarbEntry(entry) { (result) -> Void in
-                    DispatchQueue.main.async {
-                        
-                    }
+            if carbGrams > 30 {
+                lowCarbMultiplier = 1.0 // If carbs are 30 or more, then fat and protein are full weught.
+            } else {                   // If carbs are 0, then fat and protein are 50% weight.
+                lowCarbMultiplier /= 60.0 + 0.5 // If carbs are 15, then fat and protein are 75% weight.
             }
-             */
             
-            return NewCarbEntry(
-                quantity: quantity,
-                startDate: date,
+            let FPU = (proteinCalories + fatCalories) / FPCaloriesRatio
+           
+            let carbEquivilant: Double = FPU * 10.0 * lowCarbMultiplier // Is this ok?
+             
+            if carbEquivilant >= 1.0 {
+                let squareWaveDuration = 2.0 + FPU
+             
+                let entry = NewCarbEntry(
+                quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
+                startDate: date + 60 * onsetDelay,
                 foodType: foodType,
-                absorptionTime: absorptionTime,
-                externalID: originalCarbEntry?.externalID
-            )
+                absorptionTime: .hours(squareWaveDuration)) // Does this need an "external ID"?
+             
+                var carbStore: CarbStore!   /// This doesn't work yet.
+                carbStore.addCarbEntry(entry) { (result) in Void.self } /// This doesn't work yet.
+            }
+            */
+        
+        
+        return NewCarbEntry(
+            quantity: quantity,
+            startDate: date,
+            foodType: foodType,
+            absorptionTime: absorptionTime,
+            externalID: originalCarbEntry?.externalID)
         } else {
             return nil
         }
@@ -334,18 +351,19 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
         case .value?:
             if let cell = cell as? CarbDecimalTextFieldTableViewCell, let number = cell.number {
                 quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+                carbQualtity = cell.number
             } else {
                 quantity = nil
             }
         case .protein?:
             if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
-                proteinQuantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+                proteinQuantity = cell.number
             } else {
                 proteinQuantity = nil
             }
         case .fat?:
             if let cell = cell as? FatDecimalTextFieldTableViewCell, let number = cell.number {
-                fatQuantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
+                fatQuantity = cell.number
             } else {
                 fatQuantity = nil
             }
