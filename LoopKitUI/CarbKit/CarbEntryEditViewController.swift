@@ -80,12 +80,10 @@ public final class CarbEntryEditViewController: UITableViewController {
                 return nil  // No changes were made
             }
             
-            let FPCaloriesRatio = 120
-            let onsetDelay: Double = 60 // Minutes to delay FPU dose
-            
+            let FPCaloriesRatio = 120 // This should be a user-setable option.
+            let onsetDelay: Double = 60 // Minutes to delay FPU dose.
             let proteinCalories = proteinQuantity! * 4
             let fatCalories = fatQuantity! * 9
-            
             var lowCarbMultiplier: Double = Double(carbQuantity!)
             
             // If carbs are 30 or more, then fat and protein are full weught.
@@ -105,20 +103,31 @@ public final class CarbEntryEditViewController: UITableViewController {
             if carbEquivilant >= 1.0 {
                 var squareWaveDuration = Double(2) + FPU
                 
-                if squareWaveDuration > 16 {
+                if squareWaveDuration > 16 { // Set some reasonable max.
                     squareWaveDuration = 16
                 }
              
+                /*
                 let entry = NewCarbEntry(
                 quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
                 startDate: date + 60 * onsetDelay,
                 foodType: foodType,
                 absorptionTime: .hours(squareWaveDuration)) // Does this need an "external ID"?
-             
-                var carbStore: CarbStore!   /// This doesn't work yet.
+            
                 carbStore.addCarbEntry(entry) { (result) in Void.self } /// This doesn't work yet.
+                 */
+                
+                // *** This is the square-wave protein and fat entry. Need a way to do both this and the normal one.
+                return NewCarbEntry(
+                    quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
+                    startDate: date + 60 * onsetDelay,
+                    foodType: foodType,
+                    absorptionTime: .hours(squareWaveDuration),
+                    externalID: originalCarbEntry?.externalID)
+           
             }
         
+            // *** This is the normal carb entry.
             return NewCarbEntry(
                 quantity: quantity,
                 startDate: date,
