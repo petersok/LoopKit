@@ -321,6 +321,40 @@ public final class CarbEntryTableViewController: UITableViewController {
                 }
             }
         }
+        
+        // RSS - Now repeast with FPU carb equivilants.
+        
+        if let  editFPUVC = segue.source as? CarbEntryEditViewController,
+            let updatedFPUEntry = editFPUVC.updatedFPUCarbEntry
+        {
+            if let originalEntry = editFPUVC.originalCarbEntry {
+                carbStore?.replaceCarbEntry(originalEntry, withEntry: updatedFPUEntry) { (result) -> Void in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .failure(let error):
+                            self.presentAlertController(with: error)
+                        case .success:
+                            self.reloadData()
+                        }
+                    }
+                }
+            } else {
+                carbStore?.addCarbEntry(updatedFPUEntry) { (result) -> Void in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .failure(let error):
+                            self.presentAlertController(with: error)
+                        case .success:
+                            self.reloadData()
+                        }
+                    }
+                }
+            }
+        }
+        
+        
+        
+        
     }
 
     public override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
