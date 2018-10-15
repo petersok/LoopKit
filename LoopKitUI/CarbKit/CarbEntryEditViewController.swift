@@ -80,11 +80,31 @@ public final class CarbEntryEditViewController: UITableViewController {
                 return nil  // No changes were made
             }
             
+            return NewCarbEntry(
+                quantity: quantity,
+                startDate: date,
+                foodType: foodType,
+                absorptionTime: absorptionTime,
+                externalID: originalCarbEntry?.externalID
+            )
+        } else {
+            return nil
+        }
+    }
+    
+    public var updatedFPUCarbEntry: NewCarbEntry? {
+        if  let quantity = quantity,
+            let absorptionTime = absorptionTime ?? defaultAbsorptionTimes?.medium
+        {
+            if let o = originalCarbEntry, o.quantity == quantity && o.startDate == date && o.foodType == foodType && o.absorptionTime == absorptionTime {
+                return nil  // No changes were made
+            }
+            
             let FPCaloriesRatio = 120 // This should be a user-setable option.
-            let onsetDelay: Double = 60 // Minutes to delay FPU dose.
+            let onsetDelay: Double = 60 // Minutes to delay FPU dose. Should be user-setable option.
             let proteinCalories = proteinQuantity! * 4
             let fatCalories = fatQuantity! * 9
-            var lowCarbMultiplier: Double = Double(carbQuantity!)
+            var lowCarbMultiplier: Double = Double(carbQuantity!) 
             
             // If carbs are 30 or more, then fat and protein are full weught.
             // If carbs are 0, then fat and protein are 50% weight.
@@ -97,39 +117,29 @@ public final class CarbEntryEditViewController: UITableViewController {
             }
             
             let FPU = Double(proteinCalories + fatCalories) / Double(FPCaloriesRatio)
-           
-            let carbEquivilant = FPU * 10 * lowCarbMultiplier
-             
-            if carbEquivilant >= 1.0 {
-                var squareWaveDuration = Double(2) + FPU
-                
-                if squareWaveDuration > 16 { // Set some reasonable max.
-                    squareWaveDuration = 16
-                }
             
-                // This is a carb entry for just the protein and fat.
-                let FPUEntry = NewCarbEntry(
+            let carbEquivilant = FPU * 10 * lowCarbMultiplier
+            
+            var squareWaveDuration = Double(2) + FPU
+            
+            if squareWaveDuration > 16 { // Set some reasonable max.
+                squareWaveDuration = 16
+            }
+            
+            if carbEquivilant >= 1 {
+                
+                return NewCarbEntry(
                     quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
                     startDate: date + 60 * onsetDelay,
                     foodType: foodType,
                     absorptionTime: .hours(squareWaveDuration),
                     externalID: originalCarbEntry?.externalID)
                 
-                return FPUEntry
-           
             } else {
-            
-                // This is the normal carb entry.
-                let carbEntry = NewCarbEntry(
-                    quantity: quantity,
-                    startDate: date,
-                    foodType: foodType,
-                    absorptionTime: absorptionTime,
-                    externalID: originalCarbEntry?.externalID)
                 
-                return carbEntry
+                return nil
             }
-   
+            
         } else {
             return nil
         }
