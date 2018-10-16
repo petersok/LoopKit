@@ -100,7 +100,7 @@ public final class CarbEntryEditViewController: UITableViewController {
                 return nil  // No changes were made
             }
             
-            let FPCaloriesRatio = 120 // This should be a user-setable option.
+            let FPCaloriesRatio = 150 // This should be a user-setable option.
             let onsetDelay: Double = 60 // Minutes to delay FPU dose. Should be user-setable option.
             let proteinCalories = proteinQuantity! * 4
             let fatCalories = fatQuantity! * 9
