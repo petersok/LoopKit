@@ -32,7 +32,7 @@ public final class CarbEntryEditViewController: UITableViewController {
     /// Entry configuration values. Must be set before presenting.
     public var absorptionTimePickerInterval = TimeInterval(minutes: 30)
 
-    public var maxAbsorptionTime = TimeInterval(hours: 8)
+    public var maxAbsorptionTime = TimeInterval(hours: 16)
 
     public var maximumDateFutureInterval = TimeInterval(hours: 4)
 
@@ -51,6 +51,16 @@ public final class CarbEntryEditViewController: UITableViewController {
     }
 
     fileprivate var quantity: HKQuantity?
+    
+    fileprivate var unusedQuantity: HKQuantity?
+    
+    fileprivate var carbQuantity: Int? = 0
+    
+    fileprivate var fatQuantity: Int? = 0
+    
+    fileprivate var proteinQuantity: Int? = 0
+    
+    fileprivate var FPUQuantity: HKQuantity?
 
     fileprivate var date = Date()
 
@@ -77,6 +87,59 @@ public final class CarbEntryEditViewController: UITableViewController {
                 absorptionTime: absorptionTime,
                 externalID: originalCarbEntry?.externalID
             )
+        } else {
+            return nil
+        }
+    }
+    
+    public var updatedFPUCarbEntry: NewCarbEntry? {
+        if  let quantity = quantity,
+            let absorptionTime = absorptionTime ?? defaultAbsorptionTimes?.medium
+        {
+            if let o = originalCarbEntry, o.quantity == quantity && o.startDate == date && o.foodType == foodType && o.absorptionTime == absorptionTime {
+                return nil  // No changes were made
+            }
+            
+            let FPCaloriesRatio = 150 // This should be a user-setable option.
+            let onsetDelay: Double = 60 // Minutes to delay FPU dose. Should be user-setable option.
+            let proteinCalories = proteinQuantity! * 4
+            let fatCalories = fatQuantity! * 9
+            var lowCarbMultiplier: Double = Double(carbQuantity!) 
+            
+            // If carbs are 30 or more, then fat and protein are full weught.
+            // If carbs are 0, then fat and protein are 50% weight.
+            // If carbs are 15, then fat and protein are 75% weight.
+            
+            if carbQuantity! >= 30 {
+                lowCarbMultiplier = 1.0
+            } else {
+                lowCarbMultiplier = (lowCarbMultiplier / 60.0) + 0.5
+            }
+            
+            let FPU = Double(proteinCalories + fatCalories) / Double(FPCaloriesRatio)
+            
+            let carbEquivilant = FPU * 10 * lowCarbMultiplier
+            
+            var squareWaveDuration = Double(2) + FPU
+            
+            if squareWaveDuration > 16 { // Set some reasonable max.
+                squareWaveDuration = 16
+            }
+            
+            if carbEquivilant >= 1 {
+                
+                return NewCarbEntry(
+                    quantity: HKQuantity(unit: .gram(), doubleValue: carbEquivilant),
+                    startDate: date + 60 * onsetDelay,
+                    foodType: foodType,
+                    absorptionTime: .hours(squareWaveDuration),
+                    externalID: originalCarbEntry?.externalID)
+                
+            } else {
+                
+                return nil
+            }
+            
         } else {
             return nil
         }
@@ -108,11 +171,13 @@ public final class CarbEntryEditViewController: UITableViewController {
 
     fileprivate enum Row: Int {
         case value
+        case fat        // RSS
+        case protein    // RSS
         case date
         case foodType
         case absorptionTime
 
-        static let count = 4
+        static let count = 6
     }
 
     public override func numberOfSections(in tableView: UITableView) -> Int {
@@ -126,7 +191,7 @@ public final class CarbEntryEditViewController: UITableViewController {
     public override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Row(rawValue: indexPath.row)! {
         case .value:
-            let cell = tableView.dequeueReusableCell(withIdentifier: DecimalTextFieldTableViewCell.className) as! DecimalTextFieldTableViewCell
+            let cell = tableView.dequeueReusableCell(withIdentifier: CarbDecimalTextFieldTableViewCell.className) as! CarbDecimalTextFieldTableViewCell
 
             if let quantity = quantity {
                 cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
@@ -141,6 +206,41 @@ public final class CarbEntryEditViewController: UITableViewController {
             cell.delegate = self
 
             return cell
+        case .fat:
+            let cell = tableView.dequeueReusableCell(withIdentifier: FatDecimalTextFieldTableViewCell.className) as! FatDecimalTextFieldTableViewCell
+            
+            if let quantity = quantity {
+                //cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
+                cell.number = NSNumber(value: 0.0)
+            }
+            cell.textField.isEnabled = isSampleEditable
+            cell.unitLabel?.text = String(describing: preferredUnit)
+            
+            if originalCarbEntry == nil {
+                cell.textField.becomeFirstResponder()
+            }
+            
+            cell.delegate = self
+            
+            return cell
+        case .protein:
+            let cell = tableView.dequeueReusableCell(withIdentifier: ProteinDecimalTextFieldTableViewCell.className) as! ProteinDecimalTextFieldTableViewCell
+            
+            if let quantity = quantity {
+                //cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
+                cell.number = NSNumber(value: 0.0)
+            }
+            cell.textField.isEnabled = isSampleEditable
+            cell.unitLabel?.text = String(describing: preferredUnit)
+            
+            if originalCarbEntry == nil {
+                cell.textField.becomeFirstResponder()
+            }
+            
+            cell.delegate = self
+            
+            return cell
+ 
         case .date:
             let cell = tableView.dequeueReusableCell(withIdentifier: DateAndDurationTableViewCell.className) as! DateAndDurationTableViewCell
 
@@ -289,10 +389,23 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
 
         switch Row(rawValue: row) {
         case .value?:
-            if let cell = cell as? DecimalTextFieldTableViewCell, let number = cell.number {
+            if let cell = cell as? CarbDecimalTextFieldTableViewCell, let number = cell.number {
+                carbQuantity = Int(number.doubleValue)
                 quantity = HKQuantity(unit: preferredUnit, doubleValue: number.doubleValue)
             } else {
                 quantity = nil
+            }
+        case .fat?:
+            if let cell = cell as? FatDecimalTextFieldTableViewCell, let number = cell.number {
+                fatQuantity = Int(number.doubleValue)
+            } else {
+                fatQuantity = 0 // Make 0, not nil if no value to prevent crash later.
+            }
+        case .protein?:
+            if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
+                proteinQuantity = Int(number.doubleValue)
+            } else {
+                proteinQuantity = 0 // Make 0, not nil if no value to prevent crash later.
             }
         case .foodType?:
             foodType = cell.textField.text
