@@ -56,9 +56,9 @@ public final class CarbEntryEditViewController: UITableViewController {
     
     fileprivate var carbQuantity: Int? = 0
     
-    fileprivate var proteinQuantity: Int? = 0
-    
     fileprivate var fatQuantity: Int? = 0
+    
+    fileprivate var proteinQuantity: Int? = 0
     
     fileprivate var FPUQuantity: HKQuantity?
 
@@ -171,8 +171,8 @@ public final class CarbEntryEditViewController: UITableViewController {
 
     fileprivate enum Row: Int {
         case value
-        case protein // RSS
-        case fat // RSS
+        case fat        // RSS
+        case protein    // RSS
         case date
         case foodType
         case absorptionTime
@@ -206,27 +206,12 @@ public final class CarbEntryEditViewController: UITableViewController {
             cell.delegate = self
 
             return cell
-        case .protein:
-            let cell = tableView.dequeueReusableCell(withIdentifier: ProteinDecimalTextFieldTableViewCell.className) as! ProteinDecimalTextFieldTableViewCell
-            
-            if let quantity = quantity {
-                cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
-            }
-            cell.textField.isEnabled = isSampleEditable
-            cell.unitLabel?.text = String(describing: preferredUnit)
-            
-            if originalCarbEntry == nil {
-                cell.textField.becomeFirstResponder()
-            }
-            
-            cell.delegate = self
-            
-            return cell
         case .fat:
             let cell = tableView.dequeueReusableCell(withIdentifier: FatDecimalTextFieldTableViewCell.className) as! FatDecimalTextFieldTableViewCell
             
             if let quantity = quantity {
-                cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
+                //cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
+                cell.number = NSNumber(value: 0.0)
             }
             cell.textField.isEnabled = isSampleEditable
             cell.unitLabel?.text = String(describing: preferredUnit)
@@ -238,6 +223,24 @@ public final class CarbEntryEditViewController: UITableViewController {
             cell.delegate = self
             
             return cell
+        case .protein:
+            let cell = tableView.dequeueReusableCell(withIdentifier: ProteinDecimalTextFieldTableViewCell.className) as! ProteinDecimalTextFieldTableViewCell
+            
+            if let quantity = quantity {
+                //cell.number = NSNumber(value: quantity.doubleValue(for: preferredUnit))
+                cell.number = NSNumber(value: 0.0)
+            }
+            cell.textField.isEnabled = isSampleEditable
+            cell.unitLabel?.text = String(describing: preferredUnit)
+            
+            if originalCarbEntry == nil {
+                cell.textField.becomeFirstResponder()
+            }
+            
+            cell.delegate = self
+            
+            return cell
+ 
         case .date:
             let cell = tableView.dequeueReusableCell(withIdentifier: DateAndDurationTableViewCell.className) as! DateAndDurationTableViewCell
 
@@ -375,17 +378,17 @@ extension CarbEntryEditViewController: TextFieldTableViewCellDelegate {
             } else {
                 quantity = nil
             }
-        case .protein?:
-            if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
-                proteinQuantity = Int(number.doubleValue)
-            } else {
-                proteinQuantity = 0 // Make 0, not nil if no value to prevent crash later.
-            }
         case .fat?:
             if let cell = cell as? FatDecimalTextFieldTableViewCell, let number = cell.number {
                 fatQuantity = Int(number.doubleValue)
             } else {
                 fatQuantity = 0 // Make 0, not nil if no value to prevent crash later.
+            }
+        case .protein?:
+            if let cell = cell as? ProteinDecimalTextFieldTableViewCell, let number = cell.number {
+                proteinQuantity = Int(number.doubleValue)
+            } else {
+                proteinQuantity = 0 // Make 0, not nil if no value to prevent crash later.
             }
         case .foodType?:
             foodType = cell.textField.text
