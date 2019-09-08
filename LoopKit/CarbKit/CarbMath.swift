@@ -116,6 +116,57 @@ struct LinearAbsorption: CarbAbsorptionComputable {
     }
 }
 
+// MARK: - Piecewise absorption as a factor of reported duration
+struct PiecewiseAbsorption: CarbAbsorptionComputable {
+    
+    static let percentEndOfRise = 0.15
+    static let percentStartOfFall = 0.5
+    
+    static func percentAbsorptionAtTime(_ time: TimeInterval, absorptionTime: TimeInterval) -> Double {
+        let scale = 2.0 / (1.0 + percentStartOfFall - percentEndOfRise)
+        var percentTime: Double
+        switch time {
+        case let t where t <= 0:
+            percentTime = 0.0
+        case let t where t < absorptionTime:
+            percentTime = t / absorptionTime
+        default:
+            percentTime = 1.0
+        }
+        switch percentTime {
+        case let t where t < percentEndOfRise:
+            return 0.5 * scale * pow(t, 2.0) / percentEndOfRise
+        case let t where t >= percentEndOfRise && t < percentStartOfFall:
+            return scale * (t - 0.5 * percentEndOfRise)
+        case let t where t >= percentStartOfFall && t < 1.0:
+            return scale * (percentStartOfFall - 0.5 * percentEndOfRise +
+            (t - percentStartOfFall) * (1.0 - 0.5 * (t - percentStartOfFall) / (1.0 - percentStartOfFall)))
+        default:
+            return 1.0
+        }
+    }
+    
+    static func absorptionTime(forPercentAbsorption percentAbsorption: Double, atTime time: TimeInterval) -> TimeInterval {
+        let scale = 2.0 / (1.0 + percentStartOfFall - percentEndOfRise)
+        var percentTime: Double
+        switch percentAbsorption {
+        case let a where a <= 0:
+            return 0
+        case let a where a > 0.0 && a < 0.5 * scale * percentEndOfRise:
+            percentTime = (2.0 * percentEndOfRise * a / scale).squareRoot()
+            return time / percentTime
+        case let a where a >= 0.5 * scale * percentEndOfRise && a < scale * (percentStartOfFall - 0.5 * percentEndOfRise):
+            percentTime = 0.5 * percentEndOfRise + a / scale
+            return time / percentTime
+        case let a where a >= scale * (percentStartOfFall - 0.5 * percentEndOfRise) && a < 1.0:
+            percentTime = 1.0 - ((1.0 - percentStartOfFall) *
+                (1.0 + percentStartOfFall - percentEndOfRise) * (1.0 - a)).squareRoot()
+            return time / percentTime
+        default:
+            return time
+        }
+    }
+}
 
 extension CarbEntry {
     func carbsOnBoard(at date: Date, defaultAbsorptionTime: TimeInterval, delay: TimeInterval) -> Double {
