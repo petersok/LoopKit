@@ -56,8 +56,9 @@ extension CarbStatus {
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
-
-            return LinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated to allow for non-constant absorption model
+            return PiecewiseAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            //return LinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard let end = observedTimeline.last?.endDate, date <= end else {
@@ -66,7 +67,9 @@ extension CarbStatus {
             let time = date.timeIntervalSince(absorption.observedDate.end)
             let absorptionTime = absorption.estimatedTimeRemaining
 
-            return LinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated allow for non-constant absorption model
+            return PiecewiseAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            //return LinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         // Observed absorption
@@ -93,7 +96,9 @@ extension CarbStatus {
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
 
-            return LinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated to allow for a non-constant absorption rate model
+            return PiecewiseAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // return LinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard let end = observedTimeline.last?.endDate, date <= end else {
@@ -102,7 +107,9 @@ extension CarbStatus {
             let time = date.timeIntervalSince(absorption.observedDate.end)
             let absorptionTime = absorption.estimatedTimeRemaining
 
-            return absorption.clamped.doubleValue(for: unit) + LinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated to allow for a non-constant absorption rate model
+            return absorption.clamped.doubleValue(for: unit) + PiecewiseAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            //return absorption.clamped.doubleValue(for: unit) + LinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         // Observed absorption
