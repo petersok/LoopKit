@@ -190,13 +190,13 @@ struct PiecewiseAbsorption: CarbAbsorptionComputable {
         case let t where t <= 0:
             return 1.0
         case let t where t > 0 && t < percentEndOfRise:
-            return scale * (0.5 * (percentEndOfRise - t) + (percentStartOfFall - percentEndOfRise) + 0.5 * (1.0 - percentStartOfFall))
+            return scale * (0.5 * (percentEndOfRise - t) * (1.0 + t / percentEndOfRise) + (percentStartOfFall - percentEndOfRise) + 0.5 * (1.0 - percentStartOfFall)) / (1.0 - t)
         case let t where t >= percentEndOfRise && t < percentStartOfFall:
-            return scale * (0.5 * percentStartOfFall - t + 0.5)
+            return scale * (0.5 * percentStartOfFall - t + 0.5) / (1.0 - t)
         case let t where t >= percentStartOfFall && t < 1.0:
-            return scale * (0.5 * (1.0 - t))
+            return scale * (0.5 * (1.0 - t) / (1.0 - percentStartOfFall))
         default:
-            return 0.0
+            return Double.ulpOfOne
         }
     }
 }
@@ -582,16 +582,28 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
         guard minAbsorptionRate > 0 else {
             return 0
         }
-        let timeSinceStartAbsorption = observedAbsorptionDates.duration
-        let notToExceedTimeRemaining = max(maxAbsorptionTime - timeSinceStartAbsorption, 0.0)
-        let percentTime = timeSinceStartAbsorption / maxAbsorptionTime
-        let minAbsorptionRateRemaining = PiecewiseAbsorption.percentAverageRateRemainingAtTime(forPercentTime: percentTime) * minAbsorptionRate
-        guard minAbsorptionRateRemaining > 0 else {
-            return notToExceedTimeRemaining
+        print("myLoop ---------------------------- \n")
+        print("myLoop entryGrams: \(entryGrams) \n")
+        print("myLoop clampedGrams: \(clampedGrams) \n")
+        print("myLoop observedGrams: \(observedGrams) \n")
+        print("myLoop max absorption time: \(maxAbsorptionTime) \n")
+        let timeSinceStartAbsorption = lastEffectDate.timeIntervalSince(entry.startDate) - delay
+        if timeSinceStartAbsorption > delay {
+            let notToExceedTimeRemaining = max(maxAbsorptionTime - timeSinceStartAbsorption, 0.0)
+            let percentAbsorbed = clampedGrams / entryGrams
+            let dynamicAbsorptionTime = PiecewiseAbsorption.absorptionTime(forPercentAbsorption: percentAbsorbed, atTime: timeSinceStartAbsorption)
+            let dynamicTimeRemaining = max(dynamicAbsorptionTime - timeSinceStartAbsorption, 0.0)
+            let estimatedTimeRemaining = min(dynamicTimeRemaining, notToExceedTimeRemaining)
+            print("myLoop time since start: \(timeSinceStartAbsorption) \n")
+            print("myLoop dynamic absorption time: \(dynamicAbsorptionTime) \n")
+            print("myLoop dynamic time remaining: \(dynamicTimeRemaining) \n")
+            print("myLoop estimated time remaining: \(estimatedTimeRemaining) \n")
+            return(estimatedTimeRemaining)
+        } else {
+            let elapsedTime = max(timeSinceStartAbsorption, 0.0)
+            print("myLoop time since start: \(elapsedTime) \n")
+            return(maxAbsorptionTime - elapsedTime)
         }
-        let timeRemaining = (entryGrams - clampedGrams) / minAbsorptionRateRemaining
-        let maxTimeRemaining = min(timeRemaining, notToExceedTimeRemaining)
-        return maxTimeRemaining
         // return (entryGrams - clampedGrams) / minAbsorptionRate
     }
 

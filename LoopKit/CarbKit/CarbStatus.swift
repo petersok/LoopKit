@@ -51,7 +51,9 @@ extension CarbStatus {
 
         let unit = HKUnit.gram()
 
-        guard let observedTimeline = observedTimeline else {
+        // dm61 added observedTimeline.count to allow for non-constant absorption model
+        guard let observedTimeline = observedTimeline,
+            observedTimeline.count > 0 else {
             // Less than minimum observed; calc based on min absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
@@ -63,13 +65,17 @@ extension CarbStatus {
 
         guard let end = observedTimeline.last?.endDate, date <= end else {
             // Predicted absorption for remaining carbs, post-observation
-            let total = absorption.remaining.doubleValue(for: unit)
-            let time = date.timeIntervalSince(absorption.observedDate.end)
-            let absorptionTime = absorption.estimatedTimeRemaining
-
-            // dm61 updated allow for non-constant absorption model
-            return PiecewiseAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
-            //return LinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated to allow for non-constant absorption model
+            let time = date.timeIntervalSince(startDate) - delay
+            let total = absorption.total.doubleValue(for: unit)
+            if let observationEnd = observedTimeline.last?.endDate {
+                let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
+                let unabsorbedCarbs = PiecewiseAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+                return unabsorbedCarbs
+            } else {
+                // this should never happen
+                return entry.carbsOnBoard(at: date, defaultAbsorptionTime: defaultAbsorptionTime, delay: delay)
+            }
         }
 
         // Observed absorption
@@ -90,7 +96,9 @@ extension CarbStatus {
 
         let unit = HKUnit.gram()
 
-        guard let observedTimeline = observedTimeline else {
+        // dm61 added observedTimeline.count to allow for non-constant absorption model
+        guard let observedTimeline = observedTimeline,
+            observedTimeline.count > 0 else {
             // Less than minimum observed; calc based on min absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
@@ -103,13 +111,17 @@ extension CarbStatus {
 
         guard let end = observedTimeline.last?.endDate, date <= end else {
             // Predicted absorption for remaining carbs, post-observation
-            let total = absorption.remaining.doubleValue(for: unit)
-            let time = date.timeIntervalSince(absorption.observedDate.end)
-            let absorptionTime = absorption.estimatedTimeRemaining
-
-            // dm61 updated to allow for a non-constant absorption rate model
-            return absorption.clamped.doubleValue(for: unit) + PiecewiseAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
-            //return absorption.clamped.doubleValue(for: unit) + LinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            // dm61 updated to allow for non-constant absorption model
+            let time = date.timeIntervalSince(startDate) - delay
+            let total = absorption.total.doubleValue(for: unit)
+            if let observationEnd = observedTimeline.last?.endDate {
+                let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
+                let absorbedCarbs = PiecewiseAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+                return absorbedCarbs
+            } else {
+                // this should never happen
+                return entry.absorbedCarbs(at: date, absorptionTime: absorptionTime, delay: delay)
+            }
         }
 
         // Observed absorption
