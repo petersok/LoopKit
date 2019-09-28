@@ -609,6 +609,9 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
 
     /// The timeline of observed absorption, if greater than the minimum required absorption.
     private var clampedTimeline: [CarbValue]? {
+        print("myLoop ------- clampedTimeline ")
+        print("myLoop observedGrams: \(observedGrams)")
+        print("myLoop minPredictedGrams: \(minPredictedGrams)")
         return observedGrams >= minPredictedGrams ? observedTimeline : nil
     }
 
@@ -653,6 +656,7 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
         }
 
         observedEffect += effect
+        print("myLoop +++ observedEffect: \(observedEffect)")
 
         if observedCompletionDate == nil {
             // Continue recording the timeline until 100% of the carbs have been observed
@@ -786,7 +790,11 @@ extension Collection where Element: CarbEntry {
                 // dm61 updated to allow for non-constant absorption rate models
                 let effectTime = dxEffect.startDate.timeIntervalSince(builder.entry.startDate)
                 let absorptionRateAtEffectTime = builder.absorptionRateAtTime(t: effectTime)
-                let partialEffectValue = Swift.min(builder.remainingEffect, (absorptionRateAtEffectTime / totalRate) * effectValue)
+                // dm61 we need to deal with zero totalRate cases
+                var partialEffectValue: Double = 0.0
+                if totalRate > 0 {
+                    partialEffectValue = Swift.min(builder.remainingEffect, (absorptionRateAtEffectTime / totalRate) * effectValue)
+                }
                 //let partialEffectValue = Swift.min(builder.remainingEffect, (builder.minAbsorptionRate / totalRate) * effectValue)
                 // dm61 updated to allow for non-constant absorption rate models
                 totalRate -= absorptionRateAtEffectTime

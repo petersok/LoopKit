@@ -52,8 +52,7 @@ extension CarbStatus {
         let unit = HKUnit.gram()
 
         // dm61 added observedTimeline.count to allow for non-constant absorption model
-        guard let observedTimeline = observedTimeline,
-            observedTimeline.count > 0 else {
+        guard let observedTimeline = observedTimeline, observedTimeline.count > 0 else {
             // Less than minimum observed; calc based on min absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
@@ -71,6 +70,8 @@ extension CarbStatus {
             if let observationEnd = observedTimeline.last?.endDate {
                 let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
                 let unabsorbedCarbs = PiecewiseAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+                //print("myLoop --- COB --- ")
+                //print("myLoop unabsorbedCarbs: \(unabsorbedCarbs)")
                 return unabsorbedCarbs
             } else {
                 // this should never happen
@@ -97,8 +98,7 @@ extension CarbStatus {
         let unit = HKUnit.gram()
 
         // dm61 added observedTimeline.count to allow for non-constant absorption model
-        guard let observedTimeline = observedTimeline,
-            observedTimeline.count > 0 else {
+        guard let observedTimeline = observedTimeline, observedTimeline.count > 0 else {
             // Less than minimum observed; calc based on min absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
@@ -117,6 +117,8 @@ extension CarbStatus {
             if let observationEnd = observedTimeline.last?.endDate {
                 let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
                 let absorbedCarbs = PiecewiseAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+                // print("myLoop ooo absorbed carbs ooo ")
+                // print("myLoop absorbedCarbs: \(absorbedCarbs)")
                 return absorbedCarbs
             } else {
                 // this should never happen
