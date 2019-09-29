@@ -119,10 +119,10 @@ struct LinearAbsorption: CarbAbsorptionComputable {
 // MARK: - Piecewise linear absorption as a factor of reported duration
 struct PiecewiseLinearAbsorption: CarbAbsorptionComputable {
     
-    static let percentEndOfRise = 0.15
-    static let percentStartOfFall = 0.5
+    static let percentEndOfRise = 0.15 // 0 < percentEnOfRise < 1
+    static let percentStartOfFall = 0.5 // 0 < percentStartOfFall < 1, perecentStartOfFall > percentEndOfRise
     static var scale: Double {
-        return( 2.0 / (1.0 + percentStartOfFall - percentEndOfRise ) )
+        return(2.0 / (1.0 + percentStartOfFall - percentEndOfRise))
     }
     
     static func percentAbsorptionAtTime(_ time: TimeInterval, absorptionTime: TimeInterval) -> Double {
@@ -171,7 +171,7 @@ struct PiecewiseLinearAbsorption: CarbAbsorptionComputable {
     static func percentRateAtPercentTime(forPercentTime percentTime: Double) -> Double {
         switch percentTime {
         case let t where t <= 0:
-            return Double.ulpOfOne
+            return 0.0
         case let t where t > 0 && t < percentEndOfRise:
             return scale * t / percentEndOfRise
         case let t where t >= percentEndOfRise && t < percentStartOfFall:
@@ -179,7 +179,7 @@ struct PiecewiseLinearAbsorption: CarbAbsorptionComputable {
         case let t where t >= percentStartOfFall && t < 1.0:
             return scale * ((1.0 - t) / (1.0 - percentStartOfFall))
         case let t where t == 1.0:
-            return Double.ulpOfOne
+            return 0.0
         default:
             return 0.0
         }
