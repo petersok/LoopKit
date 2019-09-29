@@ -119,7 +119,7 @@ struct LinearAbsorption: CarbAbsorptionComputable {
 // MARK: - Piecewise linear absorption as a factor of reported duration
 struct PiecewiseLinearAbsorption: CarbAbsorptionComputable {
     
-    static let percentEndOfRise = 0.1
+    static let percentEndOfRise = 0.15
     static let percentStartOfFall = 0.5
     static var scale: Double {
         return( 2.0 / (1.0 + percentStartOfFall - percentEndOfRise ) )
@@ -476,7 +476,6 @@ extension Collection {
 ///   - The entry data as reported by the user
 ///   - The observed data as calculated from glucose changes relative to insulin curves
 ///   - The minimum/maximum amounts of absorption used to clamp our observation data within reasonable bounds
-// dm61 TODO: maybe we should still use user-entered absorption time initially, then allow extension to maximum absorption time? we could then also consider a larger absorptionTimeOverrun, say 2x?
 fileprivate class CarbStatusBuilder<T: CarbEntry> {
 
     // MARK: User-entered data
@@ -496,6 +495,8 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
     /// The carbohydrate-sensitivity factor for this entry, in glucose units per gram
     let carbohydrateSensitivityFactor: Double
 
+    /// The absorption time for this entry before any absorption is observed
+    let initialAbsorptionTime: TimeInterval
 
     // MARK: Minimum/maximum bounding factors
 
@@ -578,7 +579,7 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
             return(estimatedTimeRemaining)
         } else {
             let elapsedTime = max(timeSinceStartAbsorption, 0.0)
-            return(maxAbsorptionTime - elapsedTime)
+            return(initialAbsorptionTime - elapsedTime)
         }
     }
 
@@ -593,14 +594,16 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
     ///   - entry: The carb entry input
     ///   - carbUnit: The unit used for carb values
     ///   - carbohydrateSensitivityFactor: The carbohydrate-sensitivity factor for the entry, in glucose units per gram
+    ///   - initialAbsorptionTime: The absorption time for this entry before any absorption is observed
     ///   - maxAbsorptionTime: The maximum absorption time allowed for this entry, determining the minimum absorption rate
     ///   - delay: An amount of time to wait after the entry date before minimum absorption is assumed to begin
     ///   - lastEffectDate: The last recorded date of effect observation, used to initialize minimum absorption
     ///   - initialObservedEffect: The initial amount of observed effect, in glucose units. Defaults to 0.
-    init(entry: T, carbUnit: HKUnit, carbohydrateSensitivityFactor: Double, maxAbsorptionTime: TimeInterval, delay: TimeInterval, lastEffectDate: Date?, initialObservedEffect: Double = 0) {
+    init(entry: T, carbUnit: HKUnit, carbohydrateSensitivityFactor: Double, initialAbsorptionTime: TimeInterval, maxAbsorptionTime: TimeInterval, delay: TimeInterval, lastEffectDate: Date?, initialObservedEffect: Double = 0) {
         self.entry = entry
         self.carbUnit = carbUnit
         self.carbohydrateSensitivityFactor = carbohydrateSensitivityFactor
+        self.initialAbsorptionTime = initialAbsorptionTime
         self.maxAbsorptionTime = maxAbsorptionTime
         self.delay = delay
         self.observedEffect = initialObservedEffect
@@ -725,7 +728,7 @@ extension Collection where Element: CarbEntry {
             return CarbStatusBuilder(
                 entry: entry,
                 carbUnit: carbUnit,
-                carbohydrateSensitivityFactor: insulinSensitivity.doubleValue(for: glucoseUnit) / carbRatio.doubleValue(for: carbUnit),
+                carbohydrateSensitivityFactor: insulinSensitivity.doubleValue(for: glucoseUnit) / carbRatio.doubleValue(for: carbUnit), initialAbsorptionTime: (entry.absorptionTime ?? defaultAbsorptionTime),
                 maxAbsorptionTime: (entry.absorptionTime ?? defaultAbsorptionTime) * absorptionTimeOverrun,
                 delay: delay,
                 lastEffectDate: effectVelocities.last?.endDate
