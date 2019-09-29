@@ -9,7 +9,7 @@
 import Foundation
 import HealthKit
 
-// dm61 TODO: update protocol to include percentRateAtPercentTime, refactor all carb absorption models to confirm to the protocol, move protocol and carb absorption models into separate files, unify references to absorption model, make it easy to choose a model
+// dm61 TODO: update protocol to include percentRateAtPercentTime, refactor all carb absorption models to conform to the updated protocol, move protocol and carb absorption models into separate files, unify references to absorption model, make it easy to choose a model (could even make the model user selectable?)
 protocol CarbAbsorptionComputable {
     /// Returns the percentage of total carbohydrates absorbed as blood glucose at a specified interval after eating.
     ///
@@ -119,7 +119,7 @@ struct LinearAbsorption: CarbAbsorptionComputable {
 // MARK: - Piecewise linear absorption as a factor of reported duration
 struct PiecewiseLinearAbsorption: CarbAbsorptionComputable {
     
-    static let percentEndOfRise = 0.15
+    static let percentEndOfRise = 0.1
     static let percentStartOfFall = 0.5
     static var scale: Double {
         return( 2.0 / (1.0 + percentStartOfFall - percentEndOfRise ) )
@@ -476,7 +476,7 @@ extension Collection {
 ///   - The entry data as reported by the user
 ///   - The observed data as calculated from glucose changes relative to insulin curves
 ///   - The minimum/maximum amounts of absorption used to clamp our observation data within reasonable bounds
-// dm61 TODO: apply user-entered absorption time initially, allow stretching to maximum absorption time
+// dm61 TODO: maybe we should still use user-entered absorption time initially, then allow extension to maximum absorption time? we could then also consider a larger absorptionTimeOverrun, say 2x?
 fileprivate class CarbStatusBuilder<T: CarbEntry> {
 
     // MARK: User-entered data
@@ -563,13 +563,13 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
 
     /// The maximum amount of time needed for the remaining entry grams to absorb, at the fixed minimum absorption rate
     private var estimatedTimeRemaining: TimeInterval {
-        let initialDelay = delay
+        let standbyInterval = delay
         guard minAbsorptionRate > 0 else {
             return 0
         }
         let timeSinceStartAbsorption = lastEffectDate.timeIntervalSince(entry.startDate) - delay
-        // Perform dynamic adjustment of absorption time after initial delay
-        if timeSinceStartAbsorption > initialDelay {
+        // Dynamic adjustment of absorption time standbyInterval after start of absorption
+        if timeSinceStartAbsorption > standbyInterval {
             let notToExceedTimeRemaining = max(maxAbsorptionTime - timeSinceStartAbsorption, 0.0)
             let percentAbsorbed = clampedGrams / entryGrams
             let dynamicAbsorptionTime = PiecewiseLinearAbsorption.absorptionTime(forPercentAbsorption: percentAbsorbed, atTime: timeSinceStartAbsorption)
@@ -666,8 +666,14 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
     }
     
     func absorptionRateAtTime(t: TimeInterval) -> Double {
-        let percentTime = t / maxAbsorptionTime
-        return minAbsorptionRate * PiecewiseLinearAbsorption.percentRateAtPercentTime(forPercentTime: percentTime)
+        // Absorption rate found based on time nomalized to estimated total absorption time
+        let dynamicAbsorptionTime = min(t + estimatedTimeRemaining, maxAbsorptionTime)
+        guard dynamicAbsorptionTime > 0 else {
+            return(0.0)
+        }
+        let absorptionRate = entryGrams / dynamicAbsorptionTime
+        let percentTime = t / dynamicAbsorptionTime
+        return absorptionRate * PiecewiseLinearAbsorption.percentRateAtPercentTime(forPercentTime: percentTime)
     }
     
 }
@@ -769,7 +775,7 @@ extension Collection where Element: CarbEntry {
                 builder.addNextEffect(partialEffectValue, start: dxEffect.startDate, end: dxEffect.endDate)
 
                 // If there's still remainder effects with no additional entries to account them to, count them as overrun on the final entry
-                // dm61 TODO: it would probably be better to assign remainder effects to the longest lasting entry with the latest end date, not to the last entered entry
+                // dm61 TODO: we should probably assign remainder effects to the entry with the latest end date, not to the entry with the latest start date
                 if effectValue > Double(Float.ulpOfOne) && builder === activeBuilders.last! {
                     builder.addNextEffect(effectValue, start: dxEffect.startDate, end: dxEffect.endDate)
                 }

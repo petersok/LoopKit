@@ -51,26 +51,21 @@ extension CarbStatus {
 
         let unit = HKUnit.gram()
 
-        guard let observedTimeline = observedTimeline, observedTimeline.count > 0 else {
-            // Less than minimum observed or not yet started; calc based on modeled absorption rate
+        guard let observedTimeline = observedTimeline, let observationEnd = observedTimeline.last?.endDate else {
+            // Less than minimum observed or observation not yet started; calc based on modeled absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
             return PiecewiseLinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
-        guard let end = observedTimeline.last?.endDate, date <= end else {
+        guard date <= observationEnd else {
             // Predicted absorption for remaining carbs, post-observation
             let time = date.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
-            if let observationEnd = observedTimeline.last?.endDate {
-                let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-                let unabsorbedCarbs = PiecewiseLinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
-                return unabsorbedCarbs
-            } else {
-                // dm61 TODO: This should never happen, refactor to avoid spurious else
-                return entry.carbsOnBoard(at: date, defaultAbsorptionTime: defaultAbsorptionTime, delay: delay)
-            }
+            let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
+            let unabsorbedCarbs = PiecewiseLinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            return unabsorbedCarbs
         }
 
         // Observed absorption
@@ -91,26 +86,21 @@ extension CarbStatus {
 
         let unit = HKUnit.gram()
 
-        guard let observedTimeline = observedTimeline, observedTimeline.count > 0 else {
-            // Less than minimum observed or not yet started; calc based on modeled absorption rate
+        guard let observedTimeline = observedTimeline, let observationEnd = observedTimeline.last?.endDate else {
+            // Less than minimum observed or observation not yet started; calc based on modeled absorption rate
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
             return PiecewiseLinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
-        guard let end = observedTimeline.last?.endDate, date <= end else {
+        guard date <= observationEnd else {
             // Predicted absorption for remaining carbs, post-observation
             let time = date.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
-            if let observationEnd = observedTimeline.last?.endDate {
-                let absorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-                let absorbedCarbs = PiecewiseLinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
-                return absorbedCarbs
-            } else {
-                // dm61 TODO: This should never happen, refactor to avoid spurious else
-                return entry.absorbedCarbs(at: date, absorptionTime: absorptionTime, delay: delay)
-            }
+            let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
+            let absorbedCarbs = PiecewiseLinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            return absorbedCarbs
         }
 
         // Observed absorption
