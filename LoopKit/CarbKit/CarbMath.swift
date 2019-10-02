@@ -674,7 +674,9 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
     
     func absorptionRateAtTime(t: TimeInterval) -> Double {
         // Absorption rate found based on time nomalized to estimated total absorption time
-        let dynamicAbsorptionTime = min(t + estimatedTimeRemaining, maxAbsorptionTime)
+        // dm61 TODO: this creates anomalies in how carbs are allocated among overlapping entries
+        // let dynamicAbsorptionTime = min(t + estimatedTimeRemaining, maxAbsorptionTime)
+        let dynamicAbsorptionTime = maxAbsorptionTime
         guard dynamicAbsorptionTime > 0 else {
             return(0.0)
         }
@@ -773,17 +775,30 @@ extension Collection where Element: CarbEntry {
                 let absorptionRateAtEffectTime = builder.absorptionRateAtTime(t: effectTime)
                 // If total rate is zero, assign zero to partial effect
                 var partialEffectValue: Double = 0.0
+
+                print("myLoop ----------")
+                print("myLoop date: \(dxEffect.startDate)")
+                print("myLoop entry: \(builder.entryGrams)")
+                print("myLoop totalRate: \(totalRate)")
+                print("myLoop entryRate: \(absorptionRateAtEffectTime)")
+                print("myLoop effectValue (before): \(effectValue)")
+                print("myLoop remainingEffect: \(builder.remainingEffect)")
                 if totalRate > 0 {
                     partialEffectValue = Swift.min(builder.remainingEffect, (absorptionRateAtEffectTime / totalRate) * effectValue)
+                    totalRate -= absorptionRateAtEffectTime
+                    effectValue -= partialEffectValue
                 }
-                totalRate -= absorptionRateAtEffectTime
-                effectValue -= partialEffectValue
+                print("myLoop partialEffectValue: \(partialEffectValue)")
+                print("myLoop effectValue (after): \(effectValue)")
+
 
                 builder.addNextEffect(partialEffectValue, start: dxEffect.startDate, end: dxEffect.endDate)
 
                 // If there's still remainder effects with no additional entries to account them to, count them as overrun on the final entry
                 // dm61 TODO(?): we should probably assign remainder effects to the entry with the latest end date, not to the entry with the latest start date
                 if effectValue > Double(Float.ulpOfOne) && builder === activeBuilders.last! {
+                    print("myLoop ************")
+                    print("myLoop adding remainder effect: \(effectValue) to entry: \(builder.entryGrams)")
                     builder.addNextEffect(effectValue, start: dxEffect.startDate, end: dxEffect.endDate)
                 }
             }
