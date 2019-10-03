@@ -673,15 +673,21 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
     }
     
     func absorptionRateAtTime(t: TimeInterval) -> Double {
-        // Absorption rate found based on time nomalized to estimated total absorption time
-        // dm61 TODO: this creates anomalies in how carbs are allocated among overlapping entries
-        // let dynamicAbsorptionTime = min(t + estimatedTimeRemaining, maxAbsorptionTime)
-        let dynamicAbsorptionTime = maxAbsorptionTime
+        // Absorption rate for time nomalized to estimated or observed total absorption time
+        print("myLoop: -----absorptionRateAtTime-----------------")
+        print("myLoop: entryGrams: \(entryGrams)")
+        print("myLoop: at time: \(t)")
+        print("myLoop: estimatedTimeRemaining: \(estimatedTimeRemaining)")
+        print("myLoop: maxAbsorptionTime: \(maxAbsorptionTime)")
+        let dynamicAbsorptionTime = min(observedAbsorptionDates.duration + estimatedTimeRemaining, maxAbsorptionTime)
         guard dynamicAbsorptionTime > 0 else {
             return(0.0)
         }
+        print("myLoop: observedAbsorptionTime: \(observedAbsorptionDates.duration)")
+        print("myLoop: dynamicAbsorptionTime: \(dynamicAbsorptionTime)")
         let absorptionRate = entryGrams / dynamicAbsorptionTime
         let percentTime = t / dynamicAbsorptionTime
+        print("myLoop: percentTime: \(percentTime)")
         return absorptionRate * PiecewiseLinearAbsorption.percentRateAtPercentTime(forPercentTime: percentTime)
     }
     
@@ -776,21 +782,11 @@ extension Collection where Element: CarbEntry {
                 // If total rate is zero, assign zero to partial effect
                 var partialEffectValue: Double = 0.0
 
-                print("myLoop ----------")
-                print("myLoop date: \(dxEffect.startDate)")
-                print("myLoop entry: \(builder.entryGrams)")
-                print("myLoop totalRate: \(totalRate)")
-                print("myLoop entryRate: \(absorptionRateAtEffectTime)")
-                print("myLoop effectValue (before): \(effectValue)")
-                print("myLoop remainingEffect: \(builder.remainingEffect)")
                 if totalRate > 0 {
                     partialEffectValue = Swift.min(builder.remainingEffect, (absorptionRateAtEffectTime / totalRate) * effectValue)
                     totalRate -= absorptionRateAtEffectTime
                     effectValue -= partialEffectValue
                 }
-                print("myLoop partialEffectValue: \(partialEffectValue)")
-                print("myLoop effectValue (after): \(effectValue)")
-
 
                 builder.addNextEffect(partialEffectValue, start: dxEffect.startDate, end: dxEffect.endDate)
 
