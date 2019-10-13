@@ -229,6 +229,9 @@ public final class CarbStore: HealthKitSampleStore {
             }
 
             UserDefaults.standard.purgeLegacyCarbEntryKeys()
+            
+            // Switch to turn nonlinear carb model on or off
+            CarbModelSettings.nonlinearCarbModelEnabled = true
 
             // TODO: Consider resetting uploadState.uploading
         }

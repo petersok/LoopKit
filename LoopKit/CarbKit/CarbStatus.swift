@@ -56,7 +56,7 @@ extension CarbStatus {
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
-            return PiecewiseLinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            return CarbModelSettings.absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard date <= observationEnd else {
@@ -64,7 +64,7 @@ extension CarbStatus {
             let time = date.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
             let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-            let unabsorbedCarbs = PiecewiseLinearAbsorption.unabsorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let unabsorbedCarbs = CarbModelSettings.absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
             return unabsorbedCarbs
         }
 
@@ -91,7 +91,7 @@ extension CarbStatus {
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
-            return PiecewiseLinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            return CarbModelSettings.absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard date <= observationEnd else {
@@ -99,7 +99,7 @@ extension CarbStatus {
             let time = date.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
             let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-            let absorbedCarbs = PiecewiseLinearAbsorption.absorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let absorbedCarbs = CarbModelSettings.absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
             return absorbedCarbs
         }
 
