@@ -17,6 +17,14 @@ public enum CarbStoreResult<T> {
     case failure(CarbStore.CarbStoreError)
 }
 
+public enum CarbAbsorptionModel {
+    case linear
+    case nonlinear
+    case adaptiveRateNonlinear
+        
+    static var settings = CarbModelSettings(absorptionModel: LinearAbsorption(), initialAbsorptionTimeOverrun: 1.5, adaptiveAbsorptionRateEnabled: false)
+}
+
 public protocol CarbStoreDelegate: class {
 
     /// Informs the delegate that an internal error occurred
@@ -194,7 +202,8 @@ public final class CarbStore: HealthKitSampleStore {
         syncVersion: Int = 1,
         absorptionTimeOverrun: Double = 1.5,
         calculationDelta: TimeInterval = 5 /* minutes */ * 60,
-        effectDelay: TimeInterval = 10 /* minutes */ * 60
+        effectDelay: TimeInterval = 10 /* minutes */ * 60,
+        carbAbsorptionModel: CarbAbsorptionModel = .linear
     ) {
         self.cacheStore = cacheStore
         self.defaultAbsorptionTimes = defaultAbsorptionTimes
@@ -230,8 +239,15 @@ public final class CarbStore: HealthKitSampleStore {
 
             UserDefaults.standard.purgeLegacyCarbEntryKeys()
             
-            // Switch to turn nonlinear carb model on or off
-            CarbModelSettings.nonlinearCarbModelEnabled = true
+            // Carb model settings based on the selected absorption model
+            switch carbAbsorptionModel {
+            case .linear:
+                CarbAbsorptionModel.settings = CarbModelSettings(absorptionModel: LinearAbsorption(), initialAbsorptionTimeOverrun: absorptionTimeOverrun, adaptiveAbsorptionRateEnabled: false)
+            case .nonlinear:
+                CarbAbsorptionModel.settings = CarbModelSettings(absorptionModel: NonlinearAbsorption(), initialAbsorptionTimeOverrun: absorptionTimeOverrun, adaptiveAbsorptionRateEnabled: false)
+            case .adaptiveRateNonlinear:
+                CarbAbsorptionModel.settings = CarbModelSettings(absorptionModel: NonlinearAbsorption(), initialAbsorptionTimeOverrun: 1.0, adaptiveAbsorptionRateEnabled: true, adaptiveRateStandbyIntervalFraction: 0.15)
+            }
 
             // TODO: Consider resetting uploadState.uploading
         }

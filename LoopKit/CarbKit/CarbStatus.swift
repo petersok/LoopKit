@@ -41,6 +41,11 @@ extension CarbStatus: CarbEntry {
 
 
 extension CarbStatus {
+    
+    var absorptionModel: CarbAbsorptionComputable {
+      return CarbAbsorptionModel.settings.absorptionModel
+    }
+    
     func dynamicCarbsOnBoard(at date: Date, defaultAbsorptionTime: TimeInterval, delay: TimeInterval, delta: TimeInterval) -> Double {
         guard date >= startDate - delta,
             let absorption = absorption
@@ -56,15 +61,19 @@ extension CarbStatus {
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
-            return CarbModelSettings.absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            return absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard date <= observationEnd else {
             // Predicted absorption for remaining carbs, post-observation
             let time = date.timeIntervalSince(startDate) - delay
+            let timeAtObservationEnd = observationEnd.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
-            let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-            let unabsorbedCarbs = CarbModelSettings.absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let remaining = absorption.remaining.doubleValue(for: unit)
+            let dynamicAbsorptionTime = timeAtObservationEnd + absorption.estimatedTimeRemaining
+            let unabsorbedAtTime = absorptionModel.unabsorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let unabsorbedAtObservationEnd = absorptionModel.unabsorbedCarbs(of: total, atTime: timeAtObservationEnd, absorptionTime: dynamicAbsorptionTime)
+            let unabsorbedCarbs = max(remaining + unabsorbedAtTime - unabsorbedAtObservationEnd, 0.0)
             return unabsorbedCarbs
         }
 
@@ -91,15 +100,19 @@ extension CarbStatus {
             let total = absorption.total.doubleValue(for: unit)
             let time = date.timeIntervalSince(startDate) - delay
             let absorptionTime = absorption.estimatedDate.duration
-            return CarbModelSettings.absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
+            return absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: absorptionTime)
         }
 
         guard date <= observationEnd else {
             // Predicted absorption for remaining carbs, post-observation
             let time = date.timeIntervalSince(startDate) - delay
+            let timeAtObservationEnd = observationEnd.timeIntervalSince(startDate) - delay
             let total = absorption.total.doubleValue(for: unit)
-            let dynamicAbsorptionTime = observationEnd.timeIntervalSince(startDate) - delay + absorption.estimatedTimeRemaining
-            let absorbedCarbs = CarbModelSettings.absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let observed = absorption.observed.doubleValue(for: unit)
+            let dynamicAbsorptionTime = timeAtObservationEnd + absorption.estimatedTimeRemaining
+            let absorbedAtTime = absorptionModel.absorbedCarbs(of: total, atTime: time, absorptionTime: dynamicAbsorptionTime)
+            let absorbedAtObservationEnd = absorptionModel.absorbedCarbs(of: total, atTime: timeAtObservationEnd, absorptionTime: dynamicAbsorptionTime)
+            let absorbedCarbs = observed + absorbedAtTime - absorbedAtObservationEnd
             return absorbedCarbs
         }
 
