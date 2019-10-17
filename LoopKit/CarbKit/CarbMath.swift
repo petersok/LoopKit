@@ -16,7 +16,7 @@ struct CarbModelSettings {
     var adaptiveAbsorptionRateEnabled: Bool
     var adaptiveRateStandbyIntervalFraction: Double
     
-    init(absorptionModel: CarbAbsorptionComputable, initialAbsorptionTimeOverrun: Double, adaptiveAbsorptionRateEnabled: Bool, adaptiveRateStandbyIntervalFraction: Double = 0.15) {
+    init(absorptionModel: CarbAbsorptionComputable, initialAbsorptionTimeOverrun: Double, adaptiveAbsorptionRateEnabled: Bool, adaptiveRateStandbyIntervalFraction: Double = 0.2) {
         self.absorptionModel = absorptionModel
         self.initialAbsorptionTimeOverrun = initialAbsorptionTimeOverrun
         self.adaptiveAbsorptionRateEnabled = adaptiveAbsorptionRateEnabled
@@ -527,8 +527,18 @@ extension Collection {
 ///   - The minimum/maximum amounts of absorption used to clamp our observation data within reasonable bounds
 fileprivate class CarbStatusBuilder<T: CarbEntry> {
 
-    var absorptionModel: CarbAbsorptionComputable {
+    // MARK: Model settings
+    
+    private var absorptionModel: CarbAbsorptionComputable {
       return CarbAbsorptionModel.settings.absorptionModel
+    }
+    
+    private var adaptiveAbsorptionRateEnabled: Bool {
+        return CarbAbsorptionModel.settings.adaptiveAbsorptionRateEnabled
+    }
+    
+    private var adaptiveRateStandbyInterval: TimeInterval {
+        return initialAbsorptionTime * CarbAbsorptionModel.settings.adaptiveRateStandbyIntervalFraction
     }
     
     // MARK: User-entered data
@@ -577,7 +587,6 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
         return absorptionModel.absorbedCarbs(of: entryGrams, atTime: time, absorptionTime: maxAbsorptionTime)
     }
 
-
     // MARK: Incremental observation
 
     /// The date at which we observe all the carbs were absorbed. or nil if carb absorption has not finished
@@ -615,37 +624,34 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
         return min(entryGrams, max(minPredictedGrams, observedGrams))
     }
     
+    /// Time to absorb observed grams according to the carb absorption model
+    private var timeToAbsorbObservedCarbs: TimeInterval = 0.0
+    
     /// The amount of time needed for the remaining entry grams to absorb
     private var estimatedTimeRemaining: TimeInterval {
-        let timeSinceEntryStart = lastEffectDate.timeIntervalSince(entry.startDate)
-        guard timeSinceEntryStart > 0 else {
+        let time = lastEffectDate.timeIntervalSince(entry.startDate) - delay
+        guard time > 0 else {
             return initialAbsorptionTime
         }
-        let timeSinceStartAbsorption = timeSinceEntryStart - delay
-        guard timeSinceStartAbsorption > 0 else {
-            return initialAbsorptionTime - timeSinceEntryStart
-        }
-        let notToExceedTimeRemaining = max(maxAbsorptionTime - timeSinceEntryStart, 0.0)
+        let notToExceedTimeRemaining = max(maxAbsorptionTime - time, 0.0)
         guard notToExceedTimeRemaining > 0 else {
             return 0.0
         }
         let percentAbsorbed = clampedGrams / entryGrams
-        let dynamicAbsorptionTime = absorptionModel.absorptionTime(forPercentAbsorption: percentAbsorbed, atTime: timeSinceStartAbsorption)
+        let dynamicAbsorptionTime = absorptionModel.absorptionTime(forPercentAbsorption: percentAbsorbed, atTime: time)
         guard dynamicAbsorptionTime > 0 else {
             return 0.0
         }
-
         var dynamicTimeRemaining: TimeInterval
-        let adaptiveAbsorptionRateEnabled = CarbAbsorptionModel.settings.adaptiveAbsorptionRateEnabled
-        let adaptiveRateStandbyInterval = initialAbsorptionTime * CarbAbsorptionModel.settings.adaptiveRateStandbyIntervalFraction
- 
-        if adaptiveAbsorptionRateEnabled && timeSinceStartAbsorption > adaptiveRateStandbyInterval {
-            // Adaptive remaining rate: remaining time estimated assuming the observed relative absorption rate persists for the remaining carbs
-            dynamicTimeRemaining = dynamicAbsorptionTime - timeSinceStartAbsorption
+        if adaptiveAbsorptionRateEnabled && time > adaptiveRateStandbyInterval {
+            // If adaptive absorption rate is enabled, and if the time since start of absorption is greater than the standby interval, the remaining time is estimated assuming the observed relative absorption rate persists for the remaining carbs
+            dynamicTimeRemaining = dynamicAbsorptionTime - time
+            timeToAbsorbObservedCarbs = time
         } else {
-            // Standard remaining rate: if adaptive absorption rate is disabled, or if time since start of absorption is less than the standby interval, the remaining time is estimated assuming the modeled absorption rate
-            let percentTimeObserved = timeSinceStartAbsorption / dynamicAbsorptionTime
-            dynamicTimeRemaining = initialAbsorptionTime * (1.0 - percentTimeObserved)
+            // If adaptive absorption rate is disabled, or if the time since start of absorption is less than the standby interval, the remaining time is estimated assuming the modeled absorption rate
+            let percentTimeToAbsorbObservedCarbs = time / dynamicAbsorptionTime
+            timeToAbsorbObservedCarbs = percentTimeToAbsorbObservedCarbs * initialAbsorptionTime
+            dynamicTimeRemaining = initialAbsorptionTime - timeToAbsorbObservedCarbs
         }
         // time remaining must not extend beyond the maximum absorption time
         let estimatedTimeRemaining = min(dynamicTimeRemaining, notToExceedTimeRemaining)
@@ -727,7 +733,8 @@ fileprivate class CarbStatusBuilder<T: CarbEntry> {
             total: entry.quantity,
             remaining: HKQuantity(unit: carbUnit, doubleValue: entryGrams - clampedGrams),
             observedDate: observedAbsorptionDates,
-            estimatedTimeRemaining: estimatedTimeRemaining
+            estimatedTimeRemaining: estimatedTimeRemaining,
+            timeToAbsorbObservedCarbs: timeToAbsorbObservedCarbs
         )
 
         return CarbStatus(
